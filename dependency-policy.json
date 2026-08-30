@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "allowed_module_prefixes": [
+    "github.com/",
+    "go.opentelemetry.io/",
+    "go.yaml.in/",
+    "golang.org/",
+    "google.golang.org/",
+    "oras.land/"
+  ],
+  "allowed_licenses": [
+    "Apache-2.0",
+    "BSD-2-Clause",
+    "BSD-3-Clause",
+    "ISC",
+    "MIT"
+  ],
+  "forbidden_go_directives": [
+    "exclude",
+    "replace"
+  ],
+  "allow_vendor": false,
+  "require_public_checksum_database": true,
+  "allow_private_modules": false,
+  "maximum_exception_days": 90,
+  "exceptions": []
+}

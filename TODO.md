@@ -87,7 +87,7 @@ Completion metadata format:
 ## Phase 1 — Engineering foundation
 
 - [x] ENG-001 Initialize Go module using a supported pinned Go release. — completed 2026-08-30, commit 32e5b3b, evidence: `docs/evidence/eng-001-go-module.md`; `GOTOOLCHAIN=go1.26.7 go version`; `GOTOOLCHAIN=go1.26.7 go list -m`; `GOTOOLCHAIN=go1.26.7 go mod edit -json`; `./scripts/validate-phase0.sh`; `git diff --check`
-- [ ] ENG-002 Create repository structure matching domain/app/ports/adapters separation in `PLAN.md`.
+- [x] ENG-002 Create repository structure matching domain/app/ports/adapters separation in `PLAN.md`. — completed 2026-08-30, commit f30ac05, evidence: `docs/evidence/eng-002-repository-structure.md`; `gofmt -l cmd internal test`; `GOCACHE=/tmp/thinkpixelmp-eng002-go-cache GOTOOLCHAIN=go1.26.7 go test ./...`; `GOCACHE=/tmp/thinkpixelmp-eng002-go-cache GOTOOLCHAIN=go1.26.7 go vet ./...`; `./scripts/validate-phase0.sh`; `git diff --check`
 - [ ] ENG-003 Add dependency/source/license policy.
 - [ ] ENG-004 Implement typed configuration loading with safe defaults, validation, secret references, and redaction.
 - [ ] ENG-005 Implement structured logging with request/trace/tenant/artifact correlation and secret redaction.

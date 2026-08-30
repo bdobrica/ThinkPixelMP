@@ -2,6 +2,8 @@
 
 Date: 2026-08-30
 
+Implementation commit: `f30ac05` (`Establish repository package structure`)
+
 ## Implemented structure
 
 The Go repository now matches the `PLAN.md` domain/application/ports/adapters layout:

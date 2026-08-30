@@ -86,7 +86,7 @@ Completion metadata format:
 
 ## Phase 1 — Engineering foundation
 
-- [ ] ENG-001 Initialize Go module using a supported pinned Go release.
+- [x] ENG-001 Initialize Go module using a supported pinned Go release. — completed 2026-08-30, commit 32e5b3b, evidence: `docs/evidence/eng-001-go-module.md`; `GOTOOLCHAIN=go1.26.7 go version`; `GOTOOLCHAIN=go1.26.7 go list -m`; `GOTOOLCHAIN=go1.26.7 go mod edit -json`; `./scripts/validate-phase0.sh`; `git diff --check`
 - [ ] ENG-002 Create repository structure matching domain/app/ports/adapters separation in `PLAN.md`.
 - [ ] ENG-003 Add dependency/source/license policy.
 - [ ] ENG-004 Implement typed configuration loading with safe defaults, validation, secret references, and redaction.

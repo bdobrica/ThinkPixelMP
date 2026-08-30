@@ -2,6 +2,8 @@
 
 Date: 2026-08-30
 
+Implementation commit: `32e5b3b` (`Initialize Go module`)
+
 ## Decision
 
 ThinkPixelMP uses module path `github.com/bdobrica/ThinkPixelMP`, Go language/module baseline `1.26.0`, and exact toolchain `go1.26.7`.

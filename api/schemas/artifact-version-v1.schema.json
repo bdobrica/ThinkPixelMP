@@ -1,0 +1,69 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/artifact-version/v1",
+  "title": "ThinkPixelMP ArtifactVersion v1",
+  "$defs": {
+    "register": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["publisher_id", "version", "source"],
+      "properties": {
+        "publisher_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "version": {"$ref": "common-v1.schema.json#/$defs/semver"},
+        "expected_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "source": {"$ref": "#/$defs/source"}
+      }
+    },
+    "source": {
+      "oneOf": [
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "reference"],
+          "properties": {
+            "kind": {"const": "oci"},
+            "reference": {"type": "string", "minLength": 1, "maxLength": 2048}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "descriptor_reference", "endpoint"],
+          "properties": {
+            "kind": {"const": "remote"},
+            "descriptor_reference": {"type": "string", "minLength": 1, "maxLength": 2048},
+            "endpoint": {"type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048}
+          }
+        },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "import_record_id"],
+          "properties": {
+            "kind": {"const": "import-record"},
+            "import_record_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}
+          }
+        }
+      ]
+    },
+    "artifactVersion": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "artifact_id", "publisher_id", "version", "kind", "source", "resolved_digest", "descriptor_digest", "lifecycle", "registered_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "publisher_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "version": {"$ref": "common-v1.schema.json#/$defs/semver"},
+        "kind": {"$ref": "resources-v1.schema.json#/$defs/artifactKind"},
+        "source": {"$ref": "#/$defs/source"},
+        "resolved_reference": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "resolved_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "descriptor_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "lifecycle": {"type": "string", "enum": ["active", "deprecated", "quarantined", "revoked"]},
+        "registered_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

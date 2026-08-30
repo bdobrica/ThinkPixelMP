@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/promotion-attestation/v1",
+  "title": "ThinkPixelMP Promotion Attestation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "subject_digest", "tenant_id", "catalog_id", "policy_digest", "evidence_snapshot_digest", "lock_digest", "promotion_request_id", "promotion_decision_id", "decision", "decided_at", "attester"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "subject_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "policy_decision_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "evidence_snapshot_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "lock_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "promotion_request_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "promotion_decision_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "decision": {"type": "string", "enum": ["approved", "denied"]},
+    "decided_at": {"type": "string", "format": "date-time"},
+    "attester": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["service_identity", "signing_identity"],
+      "properties": {
+        "service_identity": {"type": "string", "minLength": 1, "maxLength": 512},
+        "signing_identity": {"type": "string", "minLength": 1, "maxLength": 512}
+      }
+    }
+  }
+}

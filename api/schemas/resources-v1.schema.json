@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/resources/v1",
+  "title": "ThinkPixelMP core resources v1",
+  "$defs": {
+    "labels": {
+      "type": "object",
+      "maxProperties": 64,
+      "propertyNames": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$"},
+      "additionalProperties": {"type": "string", "maxLength": 512}
+    },
+    "publisherCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["slug"],
+      "properties": {
+        "slug": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096}
+      }
+    },
+    "publisher": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "slug", "state", "created_at"],
+      "properties": {
+        "slug": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096},
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "state": {"type": "string", "enum": ["claimed", "verified", "suspended", "revoked"]},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "namespaceCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["path", "owner_publisher_id"],
+      "properties": {
+        "path": {"$ref": "common-v1.schema.json#/$defs/namespace"},
+        "owner_publisher_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}
+      }
+    },
+    "namespace": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "path", "owner_publisher_id", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "path": {"$ref": "common-v1.schema.json#/$defs/namespace"},
+        "owner_publisher_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "artifactCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace_id", "name", "kind"],
+      "properties": {
+        "namespace_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "name": {"$ref": "common-v1.schema.json#/$defs/artifactName"},
+        "kind": {"$ref": "#/$defs/artifactKind"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096},
+        "homepage": {"type": "string", "format": "uri", "maxLength": 2048},
+        "repository": {"type": "string", "format": "uri", "maxLength": 2048},
+        "labels": {"$ref": "#/$defs/labels"}
+      }
+    },
+    "artifact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "namespace_id", "identity", "name", "kind", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "namespace_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "identity": {"$ref": "common-v1.schema.json#/$defs/artifactIdentity"},
+        "name": {"$ref": "common-v1.schema.json#/$defs/artifactName"},
+        "kind": {"$ref": "#/$defs/artifactKind"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096},
+        "homepage": {"type": "string", "format": "uri", "maxLength": 2048},
+        "repository": {"type": "string", "format": "uri", "maxLength": 2048},
+        "labels": {"$ref": "#/$defs/labels"},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "catalogCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096}
+      }
+    },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "name", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "name": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "display_name": {"type": "string", "minLength": 1, "maxLength": 256},
+        "description": {"type": "string", "maxLength": 4096},
+        "active_policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "artifactKind": {"type": "string", "enum": ["skill", "agent-runtime", "mcp-server", "remote-agent", "bundle"]}
+  }
+}

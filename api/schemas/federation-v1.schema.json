@@ -1,0 +1,59 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/federation/v1",
+  "title": "ThinkPixelMP federation API v1",
+  "$defs": {
+    "sourceCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name", "kind", "base_endpoint", "fetch_policy_profile", "schedule"],
+      "properties": {
+        "name": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "kind": {"type": "string", "enum": ["oci", "mcp-registry", "a2a"]},
+        "base_endpoint": {"type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048},
+        "fetch_policy_profile": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "credential_reference": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "schedule": {
+          "oneOf": [
+            {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"const": "manual"}}},
+            {"type": "object", "additionalProperties": false, "required": ["mode", "interval_seconds"], "properties": {"mode": {"const": "interval"}, "interval_seconds": {"type": "integer", "minimum": 60, "maximum": 2592000}}}
+          ]
+        }
+      }
+    },
+    "source": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "name", "kind", "base_endpoint", "fetch_policy_profile", "schedule", "state", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "name": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "kind": {"type": "string", "enum": ["oci", "mcp-registry", "a2a"]},
+        "base_endpoint": {"type": "string", "format": "uri", "pattern": "^https://", "maxLength": 2048},
+        "fetch_policy_profile": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "credential_reference": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "schedule": {"$ref": "#/$defs/sourceCreate/properties/schedule"},
+        "state": {"type": "string", "enum": ["disabled", "enabled", "retired"]},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "stateChange": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason_code"],
+      "properties": {
+        "state": {"type": "string", "enum": ["disabled", "enabled", "retired"]},
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128},
+        "explanation": {"type": "string", "maxLength": 4096}
+      }
+    },
+    "run": {"type": "object", "additionalProperties": false, "required": ["mode"], "properties": {"mode": {"type": "string", "enum": ["full", "incremental"]}}},
+    "conflictResolution": {
+      "oneOf": [
+        {"type": "object", "additionalProperties": false, "required": ["action", "local_version", "reason"], "properties": {"action": {"const": "map-new-version"}, "local_version": {"$ref": "common-v1.schema.json#/$defs/semver"}, "reason": {"type": "string", "minLength": 1, "maxLength": 4096}}},
+        {"type": "object", "additionalProperties": false, "required": ["action", "reason"], "properties": {"action": {"const": "reject"}, "reason": {"type": "string", "minLength": 1, "maxLength": 4096}}}
+      ]
+    }
+  }
+}

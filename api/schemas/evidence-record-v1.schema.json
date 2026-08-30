@@ -1,0 +1,140 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/evidence-record/v1",
+  "title": "ThinkPixelMP EvidenceRecord v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id",
+    "tenant_id",
+    "artifact_version_id",
+    "subject_digest",
+    "category",
+    "producer",
+    "producer_event_id",
+    "report",
+    "ingestion_status",
+    "created_at",
+    "observed_at",
+    "ingested_at"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "subject_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "category": {
+      "type": "string",
+      "enum": [
+        "publisher-verification",
+        "signature-verification",
+        "provenance",
+        "sbom",
+        "vulnerability-scan",
+        "malware-analysis",
+        "static-analysis",
+        "license-analysis",
+        "agent-evaluation",
+        "human-review",
+        "runtime-compatibility",
+        "endpoint-ownership",
+        "endpoint-tls",
+        "endpoint-health"
+      ]
+    },
+    "producer": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "version": {"type": "string", "minLength": 1, "maxLength": 255}
+      }
+    },
+    "producer_event_id": {"type": "string", "minLength": 1, "maxLength": 255},
+    "report": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["digest", "media_type", "size_bytes", "reference"],
+      "properties": {
+        "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "media_type": {"type": "string", "minLength": 1, "maxLength": 255},
+        "size_bytes": {"type": "integer", "minimum": 0},
+        "reference": {"type": "string", "minLength": 1, "maxLength": 2048}
+      }
+    },
+    "ingestion_status": {"type": "string", "enum": ["accepted", "rejected", "processing-error"]},
+    "conclusion": {"type": "string", "enum": ["pass", "fail", "warning", "unknown", "not-applicable"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "observed_at": {"type": "string", "format": "date-time"},
+    "ingested_at": {"type": "string", "format": "date-time"},
+    "expires_at": {"type": "string", "format": "date-time"},
+    "normalizer_profile": {"type": "string", "minLength": 1, "maxLength": 255},
+    "summary": {"$ref": "evidence-summary-v1.schema.json"},
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"}
+    }
+  },
+  "allOf": [
+    {
+      "if": {"properties": {"ingestion_status": {"const": "accepted"}}},
+      "then": {"required": ["conclusion", "normalizer_profile", "summary"]},
+      "else": {"not": {"required": ["conclusion"]}}
+    },
+    {
+      "oneOf": [
+        {"$ref": "#/$defs/publisherVerification"}, {"$ref": "#/$defs/signatureVerification"},
+        {"$ref": "#/$defs/provenance"}, {"$ref": "#/$defs/sbom"},
+        {"$ref": "#/$defs/vulnerabilityScan"}, {"$ref": "#/$defs/malwareAnalysis"},
+        {"$ref": "#/$defs/staticAnalysis"}, {"$ref": "#/$defs/licenseAnalysis"},
+        {"$ref": "#/$defs/agentEvaluation"}, {"$ref": "#/$defs/humanReview"},
+        {"$ref": "#/$defs/runtimeCompatibility"}, {"$ref": "#/$defs/endpointOwnership"},
+        {"$ref": "#/$defs/endpointTls"}, {"$ref": "#/$defs/endpointHealth"}
+      ]
+    },
+    {
+      "if": {"properties": {"ingestion_status": {"const": "accepted"}, "category": {"const": "agent-evaluation"}}, "required": ["ingestion_status", "category"]},
+      "then": {
+        "oneOf": [
+          {"$ref": "#/$defs/evaluationPass"}, {"$ref": "#/$defs/evaluationFail"},
+          {"$ref": "#/$defs/evaluationWarning"}, {"$ref": "#/$defs/evaluationUnknown"},
+          {"$ref": "#/$defs/evaluationNotApplicable"}
+        ]
+      }
+    }
+  ],
+  "$defs": {
+    "publisherVerification": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "publisher-verification"}, "summary": {"properties": {"category": {"const": "publisher-verification"}}}}},
+    "signatureVerification": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "signature-verification"}, "summary": {"properties": {"category": {"const": "signature-verification"}}}}},
+    "provenance": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "provenance"}, "summary": {"properties": {"category": {"const": "provenance"}}}}},
+    "sbom": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "sbom"}, "summary": {"properties": {"category": {"const": "sbom"}}}}},
+    "vulnerabilityScan": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "vulnerability-scan"}, "summary": {"properties": {"category": {"const": "vulnerability-scan"}}}}},
+    "malwareAnalysis": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "malware-analysis"}, "summary": {"properties": {"category": {"const": "malware-analysis"}}}}},
+    "staticAnalysis": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "static-analysis"}, "summary": {"properties": {"category": {"const": "static-analysis"}}}}},
+    "licenseAnalysis": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "license-analysis"}, "summary": {"properties": {"category": {"const": "license-analysis"}}}}},
+    "agentEvaluation": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "agent-evaluation"}, "summary": {"properties": {"category": {"const": "agent-evaluation"}}}}},
+    "humanReview": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "human-review"}, "summary": {"properties": {"category": {"const": "human-review"}}}}},
+    "runtimeCompatibility": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "runtime-compatibility"}, "summary": {"properties": {"category": {"const": "runtime-compatibility"}}}}},
+    "endpointOwnership": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "endpoint-ownership"}, "summary": {"properties": {"category": {"const": "endpoint-ownership"}}}}},
+    "endpointTls": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "endpoint-tls"}, "summary": {"properties": {"category": {"const": "endpoint-tls"}}}}},
+    "endpointHealth": {"$ref": "#/$defs/categoryPair", "properties": {"category": {"const": "endpoint-health"}, "summary": {"properties": {"category": {"const": "endpoint-health"}}}}},
+    "evaluationPass": {"properties": {"conclusion": {"const": "pass"}, "summary": {"properties": {"details": {"properties": {"overall_outcome": {"const": "pass"}}}}}}},
+    "evaluationFail": {"properties": {"conclusion": {"const": "fail"}, "summary": {"properties": {"details": {"properties": {"overall_outcome": {"const": "fail"}}}}}}},
+    "evaluationWarning": {"properties": {"conclusion": {"const": "warning"}, "summary": {"properties": {"details": {"properties": {"overall_outcome": {"const": "warning"}}}}}}},
+    "evaluationUnknown": {"properties": {"conclusion": {"const": "unknown"}, "summary": {"properties": {"details": {"properties": {"overall_outcome": {"const": "unknown"}}}}}}},
+    "evaluationNotApplicable": {"properties": {"conclusion": {"const": "not-applicable"}, "summary": {"properties": {"details": {"properties": {"overall_outcome": {"const": "not-applicable"}}}}}}},
+    "categoryPair": {
+      "type": "object",
+      "required": ["category"],
+      "properties": {
+        "category": {"type": "string"},
+        "summary": {"type": "object"}
+      }
+    }
+  }
+}

@@ -1,0 +1,810 @@
+openapi: 3.1.0
+info:
+  title: ThinkPixelMP API
+  version: 0.1.0-phase0
+  description: Marketplace and agentic software supply-chain control-plane API.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+    description: Process liveness and safe-serving readiness probes.
+  - name: Publishers
+    description: Tenant-local publisher identities and verification state.
+  - name: Namespaces
+    description: Hierarchical tenant namespaces and publisher delegations.
+  - name: Artifacts
+    description: Immutable artifact identities, versions, and ingestion.
+  - name: Evidence
+    description: Evidence producers, immutable reports, and normalized conclusions.
+  - name: Catalogs
+    description: Contextual catalogs, entries, and signed snapshots.
+  - name: Policies
+    description: Signed policy bundles and catalog activation.
+  - name: Promotions
+    description: Review-controlled promotion workflows.
+  - name: Resolutions
+    description: Deterministic dependency and policy resolution.
+  - name: Lifecycle
+    description: Deprecation, quarantine, revocation, and reconciliation actions.
+  - name: Federation
+    description: Explicit import sources and candidate import workflows.
+  - name: Operations
+    description: Asynchronous operation status and cancellation.
+  - name: Events
+    description: Tenant event stream delivery.
+paths:
+  /livez:
+    get:
+      tags: [Health]
+      operationId: getLiveness
+      summary: Report process liveness
+      security: []
+      responses:
+        '200': {$ref: '#/components/responses/Health'}
+        '400': {$ref: '#/components/responses/Problem'}
+  /readyz:
+    get:
+      tags: [Health]
+      operationId: getReadiness
+      summary: Report safe serving readiness
+      security: []
+      responses:
+        '200': {$ref: '#/components/responses/Health'}
+        '400': {$ref: '#/components/responses/Problem'}
+        '503': {$ref: '#/components/responses/Problem'}
+  /publishers:
+    get:
+      tags: [Publishers]
+      operationId: listPublishers
+      summary: List tenant publishers
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/PublisherPage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Publishers]
+      operationId: createPublisher
+      summary: Create a tenant-local publisher
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PublisherCreate'}
+      responses: {'201': {$ref: '#/components/responses/Publisher'}, '409': {$ref: '#/components/responses/Problem'}}
+  /publishers/{publisher_id}:
+    get:
+      tags: [Publishers]
+      operationId: getPublisher
+      summary: Get a publisher
+      parameters: [{$ref: '#/components/parameters/PublisherId'}]
+      responses: {'200': {$ref: '#/components/responses/Publisher'}, '404': {$ref: '#/components/responses/Problem'}}
+  /publishers/{publisher_id}/state:
+    post:
+      tags: [Publishers]
+      operationId: changePublisherState
+      summary: Transition publisher verification state
+      parameters: [{$ref: '#/components/parameters/PublisherId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/PublisherState'}
+      responses: {'200': {$ref: '#/components/responses/Publisher'}, '409': {$ref: '#/components/responses/Problem'}, '412': {$ref: '#/components/responses/Problem'}, '428': {$ref: '#/components/responses/Problem'}}
+  /namespaces:
+    get:
+      tags: [Namespaces]
+      operationId: listNamespaces
+      summary: List tenant namespaces
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/NamespacePage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Namespaces]
+      operationId: createNamespace
+      summary: Create a tenant namespace
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/NamespaceCreate'}
+      responses: {'201': {$ref: '#/components/responses/Namespace'}, '409': {$ref: '#/components/responses/Problem'}}
+  /namespaces/{namespace_id}:
+    get:
+      tags: [Namespaces]
+      operationId: getNamespace
+      summary: Get a namespace
+      parameters: [{$ref: '#/components/parameters/NamespaceId'}]
+      responses: {'200': {$ref: '#/components/responses/Namespace'}, '404': {$ref: '#/components/responses/Problem'}}
+  /namespaces/{namespace_id}/delegations:
+    post:
+      tags: [Namespaces]
+      operationId: createNamespaceDelegation
+      summary: Delegate a strict child namespace prefix
+      parameters: [{$ref: '#/components/parameters/NamespaceId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/DelegationCreate'}
+      responses: {'201': {$ref: '#/components/responses/Delegation'}, '409': {$ref: '#/components/responses/Problem'}}
+  /namespace-delegations/{delegation_id}/revoke:
+    post:
+      tags: [Namespaces]
+      operationId: revokeNamespaceDelegation
+      summary: Revoke a namespace delegation
+      parameters: [{$ref: '#/components/parameters/DelegationId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/LifecycleReason'}
+      responses: {'200': {$ref: '#/components/responses/Delegation'}, '412': {$ref: '#/components/responses/Problem'}, '428': {$ref: '#/components/responses/Problem'}}
+  /artifacts:
+    get:
+      tags: [Artifacts]
+      operationId: searchArtifacts
+      summary: Search and filter tenant artifacts
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}, {name: query, in: query, schema: {type: string, maxLength: 512}}]
+      responses: {'200': {$ref: '#/components/responses/ArtifactPage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Artifacts]
+      operationId: createArtifact
+      summary: Create a logical artifact
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ArtifactCreate'}
+      responses: {'201': {$ref: '#/components/responses/Artifact'}, '409': {$ref: '#/components/responses/Problem'}}
+  /artifacts/{artifact_id}:
+    get:
+      tags: [Artifacts]
+      operationId: getArtifact
+      summary: Get a logical artifact
+      parameters: [{$ref: '#/components/parameters/ArtifactId'}]
+      responses: {'200': {$ref: '#/components/responses/Artifact'}, '404': {$ref: '#/components/responses/Problem'}}
+  /artifacts/{artifact_id}/versions:
+    get:
+      tags: [Artifacts]
+      operationId: listArtifactVersions
+      summary: List immutable artifact versions
+      parameters: [{$ref: '#/components/parameters/ArtifactId'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/ArtifactVersionPage'}, '404': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Artifacts]
+      operationId: registerArtifactVersion
+      summary: Register and verify an immutable artifact version
+      parameters: [{$ref: '#/components/parameters/ArtifactId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ArtifactVersionRegister'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /artifact-versions/{artifact_version_id}:
+    get:
+      tags: [Artifacts]
+      operationId: getArtifactVersion
+      summary: Get an immutable artifact version
+      parameters: [{$ref: '#/components/parameters/ArtifactVersionId'}]
+      responses: {'200': {$ref: '#/components/responses/ArtifactVersion'}, '404': {$ref: '#/components/responses/Problem'}}
+  /artifact-versions/{artifact_version_id}/evidence:
+    get:
+      tags: [Evidence]
+      operationId: listArtifactEvidence
+      summary: List evidence for an artifact version
+      parameters: [{$ref: '#/components/parameters/ArtifactVersionId'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/EvidencePage'}, '404': {$ref: '#/components/responses/Problem'}}
+  /evidence:
+    post:
+      tags: [Evidence]
+      operationId: ingestEvidence
+      summary: Ingest and normalize digest-bound evidence
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/EvidenceIngest'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /evidence-producers:
+    get:
+      tags: [Evidence]
+      operationId: listEvidenceProducers
+      summary: List configured evidence producers
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/EvidenceProducerPage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Evidence]
+      operationId: createEvidenceProducer
+      summary: Configure a scoped evidence producer
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/EvidenceProducerCreate'}
+      responses: {'201': {$ref: '#/components/responses/EvidenceProducer'}, '409': {$ref: '#/components/responses/Problem'}}
+  /evidence-producers/{evidence_producer_id}:
+    get:
+      tags: [Evidence]
+      operationId: getEvidenceProducer
+      summary: Get an evidence producer
+      parameters: [{$ref: '#/components/parameters/EvidenceProducerId'}]
+      responses: {'200': {$ref: '#/components/responses/EvidenceProducer'}, '404': {$ref: '#/components/responses/Problem'}}
+  /evidence-producers/{evidence_producer_id}/state:
+    post:
+      tags: [Evidence]
+      operationId: changeEvidenceProducerState
+      summary: Enable or disable an evidence producer
+      parameters: [{$ref: '#/components/parameters/EvidenceProducerId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/EvidenceProducerState'}
+      responses: {'200': {$ref: '#/components/responses/EvidenceProducer'}, '412': {$ref: '#/components/responses/Problem'}, '428': {$ref: '#/components/responses/Problem'}}
+  /evidence/{evidence_id}:
+    get:
+      tags: [Evidence]
+      operationId: getEvidence
+      summary: Get an immutable evidence record
+      parameters: [{$ref: '#/components/parameters/EvidenceId'}]
+      responses: {'200': {$ref: '#/components/responses/Evidence'}, '404': {$ref: '#/components/responses/Problem'}}
+  /catalogs:
+    get:
+      tags: [Catalogs]
+      operationId: listCatalogs
+      summary: List tenant catalogs
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/CatalogPage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Catalogs]
+      operationId: createCatalog
+      summary: Create a tenant catalog
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/CatalogCreate'}
+      responses: {'201': {$ref: '#/components/responses/Catalog'}, '409': {$ref: '#/components/responses/Problem'}}
+  /catalogs/{catalog_id}:
+    get:
+      tags: [Catalogs]
+      operationId: getCatalog
+      summary: Get a catalog
+      parameters: [{$ref: '#/components/parameters/CatalogId'}]
+      responses: {'200': {$ref: '#/components/responses/Catalog'}, '404': {$ref: '#/components/responses/Problem'}}
+  /catalogs/{catalog_id}/entries:
+    get:
+      tags: [Catalogs]
+      operationId: listCatalogEntries
+      summary: List immutable catalog membership history
+      parameters: [{$ref: '#/components/parameters/CatalogId'}, {$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/CatalogEntryPage'}, '404': {$ref: '#/components/responses/Problem'}}
+  /catalogs/{catalog_id}/policy-activations:
+    post:
+      tags: [Policies]
+      operationId: activateCatalogPolicy
+      summary: Activate an immutable policy bundle for a catalog
+      parameters: [{$ref: '#/components/parameters/CatalogId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/PolicyActivate'}
+      responses: {'201': {$ref: '#/components/responses/PolicyActivation'}, '409': {$ref: '#/components/responses/Problem'}}
+  /policy-bundles:
+    post:
+      tags: [Policies]
+      operationId: registerPolicyBundle
+      summary: Register and verify an immutable policy bundle
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PolicyBundleRegister'}
+      responses: {'201': {$ref: '#/components/responses/PolicyBundle'}, '409': {$ref: '#/components/responses/Problem'}}
+  /catalogs/{catalog_id}/snapshots:
+    post:
+      tags: [Catalogs]
+      operationId: createCatalogSnapshot
+      summary: Create a signed immutable catalog snapshot
+      parameters: [{$ref: '#/components/parameters/CatalogId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/SnapshotCreate'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /promotion-requests:
+    post:
+      tags: [Promotions]
+      operationId: createPromotionRequest
+      summary: Create an immutable promotion request snapshot
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PromotionRequestCreate'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /promotion-requests/{promotion_request_id}:
+    get:
+      tags: [Promotions]
+      operationId: getPromotionRequest
+      summary: Get a promotion request snapshot
+      parameters: [{$ref: '#/components/parameters/PromotionRequestId'}]
+      responses: {'200': {$ref: '#/components/responses/PromotionRequest'}, '404': {$ref: '#/components/responses/Problem'}}
+  /promotion-requests/{promotion_request_id}/reviews:
+    post:
+      tags: [Promotions]
+      operationId: submitPromotionReview
+      summary: Submit an authenticated promotion review
+      parameters: [{$ref: '#/components/parameters/PromotionRequestId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PromotionReviewCreate'}
+      responses: {'201': {$ref: '#/components/responses/PromotionReview'}, '409': {$ref: '#/components/responses/Problem'}}
+  /promotion-requests/{promotion_request_id}/decision:
+    post:
+      tags: [Promotions]
+      operationId: decidePromotion
+      summary: Trigger deterministic promotion decision
+      parameters: [{$ref: '#/components/parameters/PromotionRequestId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PromotionDecisionTrigger'}
+      responses: {'200': {$ref: '#/components/responses/PromotionDecision'}, '409': {$ref: '#/components/responses/Problem'}}
+  /promotion-requests/{promotion_request_id}/cancel:
+    post:
+      tags: [Promotions]
+      operationId: cancelPromotionRequest
+      summary: Cancel a non-terminal promotion request
+      parameters: [{$ref: '#/components/parameters/PromotionRequestId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/PromotionCancel'}
+      responses: {'200': {$ref: '#/components/responses/PromotionRequest'}, '409': {$ref: '#/components/responses/Problem'}}
+  /resolutions:
+    post:
+      tags: [Resolutions]
+      operationId: createArtifactResolution
+      summary: Create or reuse a signed immutable resolution
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ResolutionCreate'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /resolutions/{resolution_id}:
+    get:
+      tags: [Resolutions]
+      operationId: getArtifactResolution
+      summary: Get an immutable resolution and current impact
+      parameters: [{$ref: '#/components/parameters/ResolutionId'}]
+      responses: {'200': {$ref: '#/components/responses/Resolution'}, '404': {$ref: '#/components/responses/Problem'}}
+  /artifact-versions/{artifact_version_id}/deprecations:
+    post:
+      tags: [Lifecycle]
+      operationId: deprecateArtifactVersion
+      summary: Deprecate an artifact version immediately
+      parameters: [{$ref: '#/components/parameters/ArtifactVersionId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/Deprecate'}
+      responses: {'201': {$ref: '#/components/responses/ActionRecord'}, '409': {$ref: '#/components/responses/Problem'}}
+  /artifact-versions/{artifact_version_id}/quarantines:
+    post:
+      tags: [Lifecycle]
+      operationId: quarantineArtifactVersion
+      summary: Quarantine an artifact version immediately
+      parameters: [{$ref: '#/components/parameters/ArtifactVersionId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/LifecycleReason'}
+      responses: {'201': {$ref: '#/components/responses/ActionRecord'}, '409': {$ref: '#/components/responses/Problem'}}
+  /artifact-versions/{artifact_version_id}/quarantine-releases:
+    post:
+      tags: [Lifecycle]
+      operationId: releaseArtifactQuarantine
+      summary: Release an artifact version from quarantine
+      parameters: [{$ref: '#/components/parameters/ArtifactVersionId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/LifecycleReason'}
+      responses: {'201': {$ref: '#/components/responses/ActionRecord'}, '409': {$ref: '#/components/responses/Problem'}}
+  /revocations:
+    get:
+      tags: [Lifecycle]
+      operationId: listRevocations
+      summary: List append-only digest revocations
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}, {name: digest, in: query, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/sha256Digest'}}]
+      responses: {'200': {$ref: '#/components/responses/RevocationPage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Lifecycle]
+      operationId: revokeArtifactDigest
+      summary: Irreversibly revoke an artifact digest
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/Revoke'}
+      responses: {'201': {$ref: '#/components/responses/Revocation'}, '409': {$ref: '#/components/responses/Problem'}}
+  /revocations/{revocation_id}/corrections:
+    post:
+      tags: [Lifecycle]
+      operationId: appendRevocationCorrection
+      summary: Append a non-restorative revocation correction
+      parameters: [{$ref: '#/components/parameters/RevocationId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/RevocationCorrection'}
+      responses: {'201': {$ref: '#/components/responses/ActionRecord'}, '404': {$ref: '#/components/responses/Problem'}}
+  /catalog-entries/{catalog_entry_id}/remove:
+    post:
+      tags: [Catalogs]
+      operationId: removeCatalogEntry
+      summary: Remove an entry from new catalog resolution
+      parameters: [{$ref: '#/components/parameters/CatalogEntryId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/LifecycleReason'}
+      responses: {'200': {$ref: '#/components/responses/CatalogEntry'}, '412': {$ref: '#/components/responses/Problem'}, '428': {$ref: '#/components/responses/Problem'}}
+  /digest-states:
+    post:
+      tags: [Lifecycle]
+      operationId: reconcileDigestStates
+      summary: Reconcile authoritative lifecycle state for digests
+      requestBody: {$ref: '#/components/requestBodies/DigestReconcile'}
+      responses: {'200': {$ref: '#/components/responses/DigestReconcile'}, '400': {$ref: '#/components/responses/Problem'}}
+  /import-sources:
+    get:
+      tags: [Federation]
+      operationId: listImportSources
+      summary: List federation import sources
+      parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
+      responses: {'200': {$ref: '#/components/responses/ImportSourcePage'}, '401': {$ref: '#/components/responses/Problem'}}
+    post:
+      tags: [Federation]
+      operationId: createImportSource
+      summary: Create a disabled federation import source
+      parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ImportSourceCreate'}
+      responses: {'201': {$ref: '#/components/responses/ImportSource'}, '409': {$ref: '#/components/responses/Problem'}}
+  /import-sources/{import_source_id}:
+    get:
+      tags: [Federation]
+      operationId: getImportSource
+      summary: Get an import source
+      parameters: [{$ref: '#/components/parameters/ImportSourceId'}]
+      responses: {'200': {$ref: '#/components/responses/ImportSource'}, '404': {$ref: '#/components/responses/Problem'}}
+  /import-sources/{import_source_id}/state:
+    post:
+      tags: [Federation]
+      operationId: changeImportSourceState
+      summary: Enable, disable, or retire an import source
+      parameters: [{$ref: '#/components/parameters/ImportSourceId'}, {$ref: '#/components/parameters/IdempotencyKey'}, {$ref: '#/components/parameters/IfMatch'}]
+      requestBody: {$ref: '#/components/requestBodies/ImportSourceState'}
+      responses: {'200': {$ref: '#/components/responses/ImportSource'}, '412': {$ref: '#/components/responses/Problem'}, '428': {$ref: '#/components/responses/Problem'}}
+  /import-sources/{import_source_id}/runs:
+    post:
+      tags: [Federation]
+      operationId: runImportSource
+      summary: Start a full or incremental import run
+      parameters: [{$ref: '#/components/parameters/ImportSourceId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ImportRun'}
+      responses: {'202': {$ref: '#/components/responses/OperationAccepted'}, '409': {$ref: '#/components/responses/Problem'}}
+  /import-conflicts/{import_conflict_id}/resolution:
+    post:
+      tags: [Federation]
+      operationId: resolveImportConflict
+      summary: Resolve an immutable upstream version conflict
+      parameters: [{$ref: '#/components/parameters/ImportConflictId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/ImportConflictResolution'}
+      responses: {'200': {$ref: '#/components/responses/ActionRecord'}, '409': {$ref: '#/components/responses/Problem'}}
+  /operations/{operation_id}:
+    get:
+      tags: [Operations]
+      operationId: getOperation
+      summary: Get asynchronous operation state
+      parameters: [{$ref: '#/components/parameters/OperationId'}]
+      responses: {'200': {$ref: '#/components/responses/Operation'}, '404': {$ref: '#/components/responses/Problem'}}
+  /operations/{operation_id}/cancel:
+    post:
+      tags: [Operations]
+      operationId: cancelOperation
+      summary: Request best-effort cancellation of an operation
+      parameters: [{$ref: '#/components/parameters/OperationId'}, {$ref: '#/components/parameters/IdempotencyKey'}]
+      requestBody: {$ref: '#/components/requestBodies/OperationCancel'}
+      responses: {'200': {$ref: '#/components/responses/Operation'}, '409': {$ref: '#/components/responses/Problem'}}
+  /events:
+    get:
+      tags: [Events]
+      operationId: streamEvents
+      summary: Stream resumable tenant marketplace events
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          schema: {type: string, maxLength: 1024}
+        - name: type
+          in: query
+          schema: {type: array, maxItems: 32, items: {type: string}}
+      responses:
+        '200':
+          description: Tenant-scoped Server-Sent Events stream.
+          content:
+            text/event-stream:
+              schema: {type: string}
+        '409': {$ref: '#/components/responses/Problem'}
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema: {type: string, maxLength: 4096}
+    PageSize:
+      name: page_size
+      in: query
+      schema: {type: integer, minimum: 1, maximum: 200, default: 50}
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema: {type: string, minLength: 1, maxLength: 255}
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema: {type: string, minLength: 3, maxLength: 255, pattern: '^"[^"\\r\\n]+"$'}
+    PublisherId: {name: publisher_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    NamespaceId: {name: namespace_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    DelegationId: {name: delegation_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    ArtifactId: {name: artifact_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    ArtifactVersionId: {name: artifact_version_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    EvidenceId: {name: evidence_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    EvidenceProducerId: {name: evidence_producer_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    RevocationId: {name: revocation_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    CatalogEntryId: {name: catalog_entry_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    CatalogId: {name: catalog_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    PromotionRequestId: {name: promotion_request_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    ResolutionId: {name: resolution_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    ImportSourceId: {name: import_source_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    ImportConflictId: {name: import_conflict_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+    OperationId: {name: operation_id, in: path, required: true, schema: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}}
+  requestBodies:
+    PublisherCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/publisherCreate'}
+    NamespaceCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/namespaceCreate'}
+    ArtifactCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/artifactCreate'}
+    ArtifactVersionRegister:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/artifact-version-v1.schema.json#/$defs/register'}
+    EvidenceIngest:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/evidence-ingestion-v1.schema.json#/$defs/ingest'}
+    EvidenceProducerCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/evidence-ingestion-v1.schema.json#/$defs/producerCreate'}
+    CatalogCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/catalogCreate'}
+    PromotionRequestCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/requestCreate'}
+    PromotionReviewCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/reviewCreate'}
+    PromotionDecisionTrigger:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/decisionTrigger'}
+    PromotionCancel:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/cancel'}
+    PolicyBundleRegister:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/policyBundleRegister'}
+    PolicyActivate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/policyActivate'}
+    LifecycleReason:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/lifecycle-actions-v1.schema.json#/$defs/reason'}
+    Deprecate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/lifecycle-actions-v1.schema.json#/$defs/deprecate'}
+    Revoke:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/lifecycle-actions-v1.schema.json#/$defs/revoke'}
+    RevocationCorrection:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/lifecycle-actions-v1.schema.json#/$defs/correction'}
+    EvidenceProducerState:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/lifecycle-actions-v1.schema.json#/$defs/producerState'}
+    ImportSourceCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/federation-v1.schema.json#/$defs/sourceCreate'}
+    ImportSourceState:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/federation-v1.schema.json#/$defs/stateChange'}
+    ImportRun:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/federation-v1.schema.json#/$defs/run'}
+    ImportConflictResolution:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/federation-v1.schema.json#/$defs/conflictResolution'}
+    ResolutionCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/artifact-resolution-v1.schema.json#/$defs/create'}
+    PublisherState:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/publisherState'}
+    DelegationCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/delegationCreate'}
+    SnapshotCreate:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/snapshotCreate'}
+    DigestReconcile:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/digestReconcile'}
+    OperationCancel:
+      required: true
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/cancel'}
+  responses:
+    PublisherPage:
+      description: Page of publishers.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/publisherPage'}}}
+    NamespacePage:
+      description: Page of namespaces.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/namespacePage'}}}
+    ArtifactPage:
+      description: Page of artifacts.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/artifactPage'}}}
+    ArtifactVersionPage:
+      description: Page of artifact versions.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/artifactVersionPage'}}}
+    EvidencePage:
+      description: Page of evidence records.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/evidencePage'}}}
+    EvidenceProducerPage:
+      description: Page of evidence producers.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/evidenceProducerPage'}}}
+    CatalogPage:
+      description: Page of catalogs.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/catalogPage'}}}
+    CatalogEntryPage:
+      description: Page of catalog entries.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/catalogEntryPage'}}}
+    RevocationPage:
+      description: Page of revocations.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/revocationPage'}}}
+    ImportSourcePage:
+      description: Page of import sources.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/importSourcePage'}}}
+    Publisher:
+      description: Publisher representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/publisher'}
+    Namespace:
+      description: Namespace representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/namespace'}
+    Artifact:
+      description: Artifact representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/artifact'}
+    ArtifactVersion:
+      description: ArtifactVersion representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/artifact-version-v1.schema.json#/$defs/artifactVersion'}
+    EvidenceProducer:
+      description: EvidenceProducer representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/evidence-ingestion-v1.schema.json#/$defs/producer'}
+    Evidence:
+      description: EvidenceRecord representation.
+      content: {application/json: {schema: {$ref: '../schemas/evidence-record-v1.schema.json'}}}
+    Catalog:
+      description: Catalog representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/resources-v1.schema.json#/$defs/catalog'}
+    PromotionRequest:
+      description: PromotionRequest representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/promotionRequest'}
+    PromotionReview:
+      description: PromotionReview representation.
+      content: {application/json: {schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/review'}}}
+    PromotionDecision:
+      description: PromotionDecision representation.
+      content: {application/json: {schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/decision'}}}
+    PolicyBundle:
+      description: PolicyBundle representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/policyBundle'}
+    PolicyActivation:
+      description: PolicyActivation representation.
+      content: {application/json: {schema: {$ref: '../schemas/promotion-v1.schema.json#/$defs/policyActivation'}}}
+    ImportSource:
+      description: ImportSource representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/federation-v1.schema.json#/$defs/source'}
+    Resolution:
+      description: Signed immutable resolution with separate current impact.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required: [resolution, current_impact]
+            properties:
+              resolution: {$ref: '../schemas/artifact-resolution-v1.schema.json'}
+              current_impact: {$ref: '../schemas/artifact-resolution-v1.schema.json#/$defs/currentImpact'}
+    Delegation:
+      description: NamespaceDelegation representation.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/delegation'}
+    DigestReconcile:
+      description: Authoritative digest lifecycle state projection.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/administration-v1.schema.json#/$defs/digestReconcileResult'}
+    CatalogEntry:
+      description: CatalogEntry representation.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/catalogEntry'}}}
+    ActionRecord:
+      description: Immutable administrative action record.
+      content: {application/json: {schema: {$ref: '../schemas/api-envelopes-v1.schema.json#/$defs/actionRecord'}}}
+    Revocation:
+      description: Immutable revocation record.
+      content: {application/json: {schema: {$ref: '../schemas/revocation-v1.schema.json'}}}
+    Health:
+      description: Health state.
+      content:
+        application/json:
+          schema: {type: object, required: [status], properties: {status: {type: string}}, additionalProperties: false}
+    OperationAccepted:
+      description: Long-running operation accepted.
+      headers:
+        Location:
+          required: true
+          schema: {type: string}
+      content:
+        application/json:
+          schema: {$ref: '../schemas/operation-v1.schema.json'}
+    Operation:
+      description: Operation resource.
+      content:
+        application/json:
+          schema: {$ref: '../schemas/operation-v1.schema.json'}
+    Problem:
+      description: RFC 7807 Problem Details.
+      content:
+        application/problem+json:
+          schema: {$ref: '#/components/schemas/Problem'}
+  schemas:
+    ArtifactDescriptor:
+      $ref: '../schemas/artifact-descriptor-v1.schema.json'
+    ArtifactLock:
+      $ref: '../schemas/artifact-lock-v1.schema.json'
+    CatalogSnapshot:
+      $ref: '../schemas/catalog-snapshot-v1.schema.json'
+    EvidenceSummary:
+      $ref: '../schemas/evidence-summary-v1.schema.json'
+    MarketplaceEvent:
+      $ref: '../schemas/marketplace-event-v1.schema.json'
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status]
+      properties:
+        type: {type: string, format: uri-reference}
+        title: {type: string, maxLength: 256}
+        status: {type: integer, minimum: 100, maximum: 599}
+        detail: {type: string, maxLength: 2048}
+        instance: {type: string, format: uri-reference}
+        code: {type: string, maxLength: 128}
+        request_id: {$ref: '../schemas/common-v1.schema.json#/$defs/uuidV7'}

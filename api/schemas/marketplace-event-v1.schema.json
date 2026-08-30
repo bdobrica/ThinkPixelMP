@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/marketplace-event/v1",
+  "title": "ThinkPixelMP CloudEvent v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["specversion", "id", "source", "type", "subject", "time", "datacontenttype", "sequence", "data"],
+  "properties": {
+    "specversion": {"const": "1.0"},
+    "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "source": {"type": "string", "format": "uri-reference", "maxLength": 1024},
+    "type": {"type": "string"},
+    "subject": {"type": "string", "minLength": 1, "maxLength": 512},
+    "time": {"type": "string", "format": "date-time"},
+    "datacontenttype": {"const": "application/vnd.thinkpixel.marketplace-event.v1+json"},
+    "sequence": {"type": "integer", "minimum": 1},
+    "data": {"type": "object"}
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/artifactRegistered"},
+    {"$ref": "#/$defs/artifactLifecycle"},
+    {"$ref": "#/$defs/evidenceAccepted"},
+    {"$ref": "#/$defs/policyActivated"},
+    {"$ref": "#/$defs/promotionDecided"},
+    {"$ref": "#/$defs/catalogEntryChanged"},
+    {"$ref": "#/$defs/resolutionCreated"},
+    {"$ref": "#/$defs/importFinished"}
+  ],
+  "$defs": {
+    "artifactRegistered": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.artifact.registered.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "artifact_version_id", "artifact_digest", "descriptor_digest"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "descriptor_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+          }
+        }
+      }
+    },
+    "artifactLifecycle": {
+      "properties": {
+        "type": {"enum": ["io.thinkpixel.mp.artifact.deprecated.v1", "io.thinkpixel.mp.artifact.quarantined.v1", "io.thinkpixel.mp.artifact.quarantine-released.v1", "io.thinkpixel.mp.artifact.revoked.v1"]},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "artifact_version_id", "artifact_digest", "previous_state", "current_state", "reason_code"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "previous_state": {"type": "string", "enum": ["active", "deprecated", "quarantined"]},
+            "current_state": {"type": "string", "enum": ["active", "deprecated", "quarantined", "revoked"]},
+            "reason_code": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        }
+      },
+      "oneOf": [
+        {"properties": {"type": {"const": "io.thinkpixel.mp.artifact.deprecated.v1"}, "data": {"properties": {"current_state": {"const": "deprecated"}}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.artifact.quarantined.v1"}, "data": {"properties": {"current_state": {"const": "quarantined"}}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.artifact.quarantine-released.v1"}, "data": {"properties": {"current_state": {"const": "active"}}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.artifact.revoked.v1"}, "data": {"properties": {"current_state": {"const": "revoked"}}}}}
+      ]
+    },
+    "evidenceAccepted": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.evidence.accepted.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "evidence_record_id", "artifact_digest", "category", "conclusion", "report_digest"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "evidence_record_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "category": {"type": "string", "minLength": 1, "maxLength": 128}, "conclusion": {"type": "string", "enum": ["pass", "fail", "warning", "unknown", "not-applicable"]},
+            "report_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+          }
+        }
+      }
+    },
+    "policyActivated": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.policy.activated.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "catalog_id", "policy_digest", "activation_digest"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "activation_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+          }
+        }
+      }
+    },
+    "promotionDecided": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.promotion.decided.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "promotion_request_id", "promotion_decision_id", "artifact_digest", "catalog_id", "decision"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "promotion_request_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "promotion_decision_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}, "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "decision": {"type": "string", "enum": ["approved", "denied", "expired", "cancelled"]}
+          }
+        }
+      }
+    },
+    "catalogEntryChanged": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.catalog-entry.changed.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "catalog_id", "catalog_entry_id", "artifact_digest", "previous_state", "current_state"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "catalog_entry_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}, "previous_state": {"type": "string", "enum": ["absent", "active", "removed"]},
+            "current_state": {"type": "string", "enum": ["active", "removed"]}
+          }
+        }
+      }
+    },
+    "resolutionCreated": {
+      "properties": {
+        "type": {"const": "io.thinkpixel.mp.resolution.created.v1"},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "resolution_id", "resolution_digest", "root_digest", "lock_digest"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "resolution_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "resolution_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "root_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}, "lock_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+          }
+        }
+      }
+    },
+    "importFinished": {
+      "properties": {
+        "type": {"enum": ["io.thinkpixel.mp.import.completed.v1", "io.thinkpixel.mp.import.failed.v1", "io.thinkpixel.mp.import.conflicted.v1"]},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "import_source_id", "import_run_id", "outcome"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "import_source_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}, "import_run_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "outcome": {"type": "string", "enum": ["completed", "failed", "conflicted"]}, "reason_code": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        }
+      },
+      "oneOf": [
+        {"properties": {"type": {"const": "io.thinkpixel.mp.import.completed.v1"}, "data": {"properties": {"outcome": {"const": "completed"}}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.import.failed.v1"}, "data": {"properties": {"outcome": {"const": "failed"}}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.import.conflicted.v1"}, "data": {"properties": {"outcome": {"const": "conflicted"}}}}}
+      ]
+    }
+  }
+}

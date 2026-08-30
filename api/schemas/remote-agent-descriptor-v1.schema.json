@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/remote-agent-descriptor/v1",
+  "title": "ThinkPixelMP RemoteAgentDescriptor v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "artifact", "requirements", "dependencies", "spec"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "remote-agent"},
+    "artifact": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/coordinates"},
+    "requirements": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/requirements"},
+    "dependencies": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/dependencies"},
+    "spec": {
+      "type": "object", "additionalProperties": false,
+      "required": ["agent_card", "normalized"],
+      "properties": {
+        "agent_card": {
+          "type": "object", "additionalProperties": false,
+          "required": ["media_type", "digest", "size_bytes", "layer_digest"],
+          "properties": {
+            "media_type": {"const": "application/json"},
+            "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "size_bytes": {"type": "integer", "minimum": 2},
+            "layer_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "signature_reference": {"type": "string", "minLength": 1, "maxLength": 2048}
+          }
+        },
+        "normalized": {
+          "type": "object", "additionalProperties": false,
+          "required": ["endpoint", "protocol_version", "skills"],
+          "properties": {
+            "endpoint": {"type": "string", "format": "uri", "maxLength": 2048, "pattern": "^https://"},
+            "protocol_version": {"$ref": "common-v1.schema.json#/$defs/semver"},
+            "skills": {"type": "array", "maxItems": 1024, "items": {"type": "string", "minLength": 1, "maxLength": 255}},
+            "capabilities": {"type": "array", "maxItems": 256, "uniqueItems": true, "items": {"type": "string", "minLength": 1, "maxLength": 255}}
+          }
+        }
+      }
+    }
+  }
+}

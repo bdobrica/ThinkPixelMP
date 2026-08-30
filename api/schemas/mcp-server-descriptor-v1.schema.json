@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/mcp-server-descriptor/v1",
+  "title": "ThinkPixelMP MCPServerDescriptor v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "artifact", "requirements", "dependencies", "spec"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "mcp-server"},
+    "artifact": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/coordinates"},
+    "requirements": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/requirements"},
+    "dependencies": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/dependencies"},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["protocol_compatibility", "delivery", "authentication"],
+      "properties": {
+        "protocol_compatibility": {"type": "string", "minLength": 1, "maxLength": 128},
+        "delivery": {
+          "oneOf": [
+            {
+              "type": "object", "additionalProperties": false, "required": ["mode", "transport", "image"],
+              "properties": {
+                "mode": {"const": "oci"},
+                "transport": {"const": "stdio"},
+                "image": {
+                  "type": "object", "additionalProperties": false, "required": ["reference", "digest"],
+                  "properties": {
+                    "reference": {"type": "string", "minLength": 73, "maxLength": 2048, "pattern": "^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$"},
+                    "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+                  }
+                }
+              }
+            },
+            {
+              "type": "object", "additionalProperties": false, "required": ["mode", "transport", "endpoint"],
+              "properties": {
+                "mode": {"const": "remote"},
+                "transport": {"const": "streamable-http"},
+                "endpoint": {"type": "string", "format": "uri", "maxLength": 2048, "pattern": "^https://"}
+              }
+            }
+          ]
+        },
+        "authentication": {
+          "type": "array", "maxItems": 16,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["type", "name", "required"],
+            "properties": {
+              "type": {"type": "string", "enum": ["none", "oauth2", "oidc", "api-key", "mtls"]},
+              "name": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+              "required": {"type": "boolean"}
+            }
+          }
+        },
+        "tools": {
+          "type": "array", "maxItems": 1024,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["name"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1, "maxLength": 255},
+              "description": {"type": "string", "maxLength": 4096},
+              "input_schema_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+            }
+          }
+        }
+      }
+    }
+  }
+}

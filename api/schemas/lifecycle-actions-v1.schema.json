@@ -1,0 +1,61 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/lifecycle-actions/v1",
+  "title": "ThinkPixelMP lifecycle actions v1",
+  "$defs": {
+    "reason": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason_code"],
+      "properties": {
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"},
+        "explanation": {"type": "string", "maxLength": 4096},
+        "evidence_ids": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}}
+      }
+    },
+    "deprecate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason_code"],
+      "properties": {
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"},
+        "explanation": {"type": "string", "maxLength": 4096},
+        "evidence_ids": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}},
+        "replacement_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+      }
+    },
+    "revoke": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["artifact_version_id", "subject_digest", "severity", "reason_code"],
+      "properties": {
+        "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "subject_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"},
+        "explanation": {"type": "string", "maxLength": 4096},
+        "evidence_ids": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}},
+        "replacement_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+      }
+    },
+    "correction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason_code", "explanation"],
+      "properties": {
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"},
+        "explanation": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    },
+    "producerState": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "reason_code"],
+      "properties": {
+        "state": {"type": "string", "enum": ["enabled", "disabled"]},
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128},
+        "explanation": {"type": "string", "maxLength": 4096}
+      }
+    }
+  }
+}

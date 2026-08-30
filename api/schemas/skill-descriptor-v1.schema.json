@@ -1,0 +1,71 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/skill-descriptor/v1",
+  "title": "ThinkPixelMP generated SkillDescriptor v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "kind", "artifact", "requirements", "dependencies", "spec"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "kind": {"const": "skill"},
+    "artifact": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/coordinates"},
+    "requirements": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/requirements"},
+    "dependencies": {"$ref": "artifact-descriptor-v1.schema.json#/$defs/dependencies"},
+    "spec": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["source", "package", "classification"],
+      "properties": {
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["path", "digest", "metadata"],
+          "properties": {
+            "path": {"const": "SKILL.md"},
+            "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "metadata": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["name", "description"],
+              "properties": {
+                "name": {"type": "string", "minLength": 1, "maxLength": 128},
+                "description": {"type": "string", "minLength": 1, "maxLength": 2048},
+                "license": {"type": "string", "minLength": 1, "maxLength": 128},
+                "compatibility": {"type": "string", "minLength": 1, "maxLength": 500}
+              }
+            }
+          }
+        },
+        "package": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["media_type", "digest", "size_bytes", "file_count"],
+          "properties": {
+            "media_type": {"const": "application/vnd.thinkpixel.skill.layer.v1+tar+gzip"},
+            "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+            "size_bytes": {"type": "integer", "minimum": 1},
+            "file_count": {"type": "integer", "minimum": 1}
+          }
+        },
+        "classification": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["artifact_class", "reasons"],
+          "properties": {
+            "artifact_class": {"type": "string", "enum": ["instructional", "executable-local"]},
+            "reasons": {
+              "type": "array",
+              "maxItems": 32,
+              "uniqueItems": true,
+              "items": {"type": "string", "enum": ["executable-file", "shebang", "binary-outside-assets", "skill-markdown-code"]}
+            }
+          },
+          "allOf": [
+            {"if": {"properties": {"artifact_class": {"const": "instructional"}}}, "then": {"properties": {"reasons": {"maxItems": 0}}}},
+            {"if": {"properties": {"artifact_class": {"const": "executable-local"}}}, "then": {"properties": {"reasons": {"minItems": 1}}}}
+          ]
+        }
+      }
+    }
+  }
+}

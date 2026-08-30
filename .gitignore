@@ -1,0 +1,4 @@
+node_modules/
+api/openapi/*.bundle.yaml
+api/openapi/*.bundle.json
+.redocly/

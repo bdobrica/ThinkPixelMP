@@ -1,0 +1,58 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/catalog-snapshot/v1",
+  "title": "ThinkPixelMP CatalogSnapshot v1",
+  "description": "Complete, self-contained immutable catalog view. The parent is ancestry metadata only. snapshot_digest is SHA-256 over RFC 8785 canonical JSON with snapshot_digest and signing_identity omitted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "snapshot_id", "tenant_id", "catalog_id", "created_at", "entries", "policy", "lifecycle", "snapshot_digest", "signing_identity"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "snapshot_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "created_at": {"type": "string", "format": "date-time"},
+    "parent_snapshot_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "entries": {
+      "type": "array", "maxItems": 100000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["catalog_entry_id", "artifact_version_id", "artifact_digest", "entry_state", "promotion_decision_id"],
+        "properties": {
+          "catalog_entry_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+          "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+          "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+          "entry_state": {"type": "string", "enum": ["active", "removed"]},
+          "promotion_decision_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+          "promotion_attestation_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+          "resolution_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+          "lock_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+          "evidence_record_digests": {"type": "array", "maxItems": 4096, "uniqueItems": true, "items": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}},
+          "evidence_report_digests": {"type": "array", "maxItems": 4096, "uniqueItems": true, "items": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}}
+        }
+      }
+    },
+    "policy": {
+      "type": "object", "additionalProperties": false,
+      "required": ["bundle_digest", "activation_digest"],
+      "properties": {
+        "bundle_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "activation_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+      }
+    },
+    "lifecycle": {
+      "type": "array", "maxItems": 100000,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["artifact_digest", "state", "record_digest"],
+        "properties": {
+          "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+          "state": {"type": "string", "enum": ["active", "deprecated", "quarantined", "revoked"]},
+          "record_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+        }
+      }
+    },
+    "snapshot_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "signing_identity": {"type": "string", "minLength": 1, "maxLength": 512}
+  }
+}

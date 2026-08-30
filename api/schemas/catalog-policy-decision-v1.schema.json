@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/catalog-policy-decision/v1",
+  "title": "ThinkPixelMP CatalogPolicyDecision v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "allow", "reason_codes", "review"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "allow": {"type": "boolean"},
+    "reason_codes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"}
+    },
+    "required_evidence": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minimum_distinct_reviewers", "requester_may_review"],
+      "properties": {
+        "minimum_distinct_reviewers": {"type": "integer", "minimum": 0, "maximum": 16},
+        "requester_may_review": {"type": "boolean"},
+        "required_roles": {
+          "type": "array",
+          "maxItems": 16,
+          "uniqueItems": true,
+          "items": {"$ref": "common-v1.schema.json#/$defs/dnsToken"}
+        }
+      }
+    },
+    "detail": {"type": "string", "maxLength": 2048}
+  }
+}

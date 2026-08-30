@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/revocation/v1",
+  "title": "ThinkPixelMP Revocation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "tenant_id", "artifact_version_id", "subject_digest", "severity", "reason_code", "effective_at", "administrator_id"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "subject_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+    "severity": {"type": "string", "enum": ["low", "medium", "high", "critical"]},
+    "reason_code": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$"},
+    "explanation": {"type": "string", "maxLength": 4096},
+    "effective_at": {"type": "string", "format": "date-time"},
+    "administrator_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "evidence_ids": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}
+    },
+    "replacement_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+  }
+}

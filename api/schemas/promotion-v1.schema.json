@@ -1,0 +1,133 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/promotion/v1",
+  "title": "ThinkPixelMP promotion API v1",
+  "$defs": {
+    "requestCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["catalog_id", "artifact_version_id"],
+      "properties": {
+        "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "selected_optional_dependencies": {
+          "type": "array",
+          "maxItems": 256,
+          "uniqueItems": true,
+          "items": {"$ref": "common-v1.schema.json#/$defs/dnsToken"}
+        },
+        "additional_evidence_ids": {
+          "type": "array",
+          "maxItems": 64,
+          "uniqueItems": true,
+          "items": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}
+        }
+      }
+    },
+    "reviewCreate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["decision", "reason"],
+      "properties": {
+        "decision": {"type": "string", "enum": ["approve", "reject"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 4096}
+      }
+    },
+    "cancel": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reason"],
+      "properties": {"reason": {"type": "string", "minLength": 1, "maxLength": 4096}}
+    },
+    "decisionTrigger": {"type": "object", "additionalProperties": false, "maxProperties": 0},
+    "promotionRequest": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "catalog_id", "artifact_version_id", "artifact_digest", "lock_digest", "policy_digest", "evidence_snapshot_digest", "requester_id", "state", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "lock_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "evidence_snapshot_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "requester_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "state": {"type": "string", "enum": ["submitted", "evaluating", "awaiting-review", "approved", "denied", "cancelled"]},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "policyBundleRegister": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["reference", "expected_digest", "entrypoint"],
+      "properties": {
+        "reference": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "expected_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "entrypoint": {"type": "string", "minLength": 1, "maxLength": 255, "pattern": "^[a-z0-9](?:[a-z0-9_./-]*[a-z0-9])?$"}
+      }
+    },
+    "policyActivate": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policy_bundle_id"],
+      "properties": {"policy_bundle_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"}}
+    },
+    "policyBundle": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "reference", "digest", "entrypoint", "trust", "registered_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "reference": {"type": "string", "minLength": 1, "maxLength": 2048},
+        "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "entrypoint": {"type": "string", "minLength": 1, "maxLength": 255},
+        "trust": {"type": "string", "enum": ["trusted", "untrusted"]},
+        "registered_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "policyActivation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "catalog_id", "policy_bundle_id", "policy_digest", "actor_id", "activated_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "policy_bundle_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "actor_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "activated_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "review": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "promotion_request_id", "reviewer_id", "decision", "reason", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "promotion_request_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "reviewer_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "decision": {"type": "string", "enum": ["approve", "reject"]},
+        "reason": {"type": "string", "minLength": 1, "maxLength": 4096},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "decision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "promotion_request_id", "outcome", "policy_digest", "lock_digest", "evidence_snapshot_digest", "decided_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "promotion_request_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "outcome": {"type": "string", "enum": ["approved", "denied"]},
+        "policy_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "lock_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "evidence_snapshot_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "decided_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

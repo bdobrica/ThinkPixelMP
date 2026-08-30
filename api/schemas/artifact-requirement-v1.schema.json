@@ -1,0 +1,111 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/artifact-requirement/v1",
+  "title": "ThinkPixelMP ArtifactRequirement v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "required": {"$ref": "#/$defs/capabilitySet"},
+        "optional": {"$ref": "#/$defs/capabilitySet"}
+      }
+    },
+    "runtime": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "profile": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+        "minimum_isolation_class": {
+          "type": "string",
+          "enum": ["container-standard", "microvm-strong", "confidential-strong"]
+        },
+        "os": {"type": "string", "enum": ["linux"]},
+        "architectures": {
+          "type": "array",
+          "minItems": 1,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {"type": "string", "enum": ["amd64", "arm64"]}
+        },
+        "minimum_cpu_millicores": {"type": "integer", "minimum": 1},
+        "minimum_memory_bytes": {"type": "integer", "minimum": 1},
+        "minimum_ephemeral_storage_bytes": {"type": "integer", "minimum": 1},
+        "minimum_workspace_storage_bytes": {"type": "integer", "minimum": 1},
+        "durable_workspace_required": {"type": "boolean"},
+        "gpu_required": {"type": "boolean"},
+        "gpu_classes": {
+          "type": "array",
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {"$ref": "common-v1.schema.json#/$defs/dnsToken"}
+        },
+        "adapter": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["kind", "compatibility"],
+          "properties": {
+            "kind": {"$ref": "common-v1.schema.json#/$defs/dnsToken"},
+            "compatibility": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        }
+      }
+    },
+    "network": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["profile"],
+      "properties": {
+        "profile": {
+          "type": "string",
+          "enum": ["none", "thinkpixel-only", "package-mirrors", "restricted-external", "unrestricted-standalone"]
+        },
+        "endpoint_classes": {
+          "type": "array",
+          "maxItems": 32,
+          "uniqueItems": true,
+          "items": {"$ref": "common-v1.schema.json#/$defs/dnsToken"}
+        }
+      },
+      "allOf": [
+        {
+          "if": {"properties": {"profile": {"const": "restricted-external"}}},
+          "then": {"required": ["endpoint_classes"], "properties": {"endpoint_classes": {"minItems": 1}}},
+          "else": {"properties": {"endpoint_classes": {"maxItems": 0}}}
+        }
+      ]
+    },
+    "integrations": {
+      "type": "array",
+      "maxItems": 64,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind", "identifier", "required"],
+        "properties": {
+          "kind": {"type": "string", "enum": ["mcp-server", "a2a-peer", "model-feature", "model-family", "artifact-store"]},
+          "identifier": {"type": "string", "minLength": 1, "maxLength": 255},
+          "required": {"type": "boolean"}
+        }
+      }
+    }
+  },
+  "$defs": {
+    "capability": {
+      "type": "string",
+      "minLength": 3,
+      "maxLength": 255,
+      "pattern": "^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?)+$"
+    },
+    "capabilitySet": {
+      "type": "array",
+      "maxItems": 256,
+      "uniqueItems": true,
+      "items": {"$ref": "#/$defs/capability"}
+    }
+  }
+}

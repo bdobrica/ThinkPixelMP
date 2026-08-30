@@ -1,0 +1,199 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/evidence-summary/v1",
+  "title": "ThinkPixelMP normalized evidence summary v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "category", "details"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "category": {"type": "string"},
+    "details": {"type": "object"}
+  },
+  "oneOf": [
+    {"$ref": "#/$defs/provenanceBranch"},
+    {"$ref": "#/$defs/vulnerabilityBranch"},
+    {"$ref": "#/$defs/licenseBranch"},
+    {"$ref": "#/$defs/evaluationBranch"},
+    {"$ref": "#/$defs/sbomBranch"},
+    {"$ref": "#/$defs/humanReviewBranch"},
+    {"$ref": "#/$defs/assertionBranch"}
+  ],
+  "$defs": {
+    "provenanceBranch": {
+      "properties": {
+        "category": {"const": "provenance"},
+        "details": {"$ref": "#/$defs/provenance"}
+      }
+    },
+    "vulnerabilityBranch": {
+      "properties": {
+        "category": {"const": "vulnerability-scan"},
+        "details": {"$ref": "#/$defs/vulnerability"}
+      }
+    },
+    "licenseBranch": {
+      "properties": {
+        "category": {"const": "license-analysis"},
+        "details": {"$ref": "#/$defs/license"}
+      }
+    },
+    "evaluationBranch": {
+      "properties": {
+        "category": {"const": "agent-evaluation"},
+        "details": {"$ref": "#/$defs/evaluation"}
+      }
+    },
+    "sbomBranch": {
+      "properties": {
+        "category": {"const": "sbom"},
+        "details": {"$ref": "#/$defs/sbom"}
+      }
+    },
+    "humanReviewBranch": {
+      "properties": {
+        "category": {"const": "human-review"},
+        "details": {"$ref": "#/$defs/humanReview"}
+      }
+    },
+    "assertionBranch": {
+      "properties": {
+        "category": {"enum": ["publisher-verification", "signature-verification", "malware-analysis", "static-analysis", "runtime-compatibility", "endpoint-ownership", "endpoint-tls", "endpoint-health"]},
+        "details": {"$ref": "#/$defs/assertions"}
+      }
+    },
+    "subject": {
+      "type": "object", "additionalProperties": false,
+      "required": ["name", "digest"],
+      "properties": {
+        "name": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"}
+      }
+    },
+    "provenance": {
+      "type": "object", "additionalProperties": false,
+      "required": ["predicate_version", "subjects", "builder_identity", "build_type", "materials"],
+      "properties": {
+        "predicate_version": {"const": "https://slsa.dev/provenance/v1"},
+        "subjects": {"type": "array", "minItems": 1, "maxItems": 256, "items": {"$ref": "#/$defs/subject"}},
+        "builder_identity": {"type": "string", "minLength": 1, "maxLength": 1024},
+        "build_type": {"type": "string", "format": "uri", "maxLength": 2048},
+        "invocation_config_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "materials": {"type": "array", "maxItems": 4096, "items": {"$ref": "#/$defs/subject"}}
+      }
+    },
+    "severity": {"type": "string", "enum": ["unknown", "none", "low", "medium", "high", "critical"]},
+    "vulnerability": {
+      "type": "object", "additionalProperties": false,
+      "required": ["finding_count", "maximum_severity", "counts", "findings"],
+      "properties": {
+        "finding_count": {"type": "integer", "minimum": 0},
+        "maximum_severity": {"$ref": "#/$defs/severity"},
+        "counts": {
+          "type": "object", "additionalProperties": false,
+          "required": ["unknown", "none", "low", "medium", "high", "critical"],
+          "properties": {
+            "unknown": {"type": "integer", "minimum": 0}, "none": {"type": "integer", "minimum": 0},
+            "low": {"type": "integer", "minimum": 0}, "medium": {"type": "integer", "minimum": 0},
+            "high": {"type": "integer", "minimum": 0}, "critical": {"type": "integer", "minimum": 0}
+          }
+        },
+        "findings": {
+          "type": "array", "maxItems": 10000,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["package", "advisory_id", "severity"],
+            "properties": {
+              "package": {"type": "string", "minLength": 1, "maxLength": 512},
+              "purl": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^pkg:"},
+              "advisory_id": {"type": "string", "minLength": 1, "maxLength": 255},
+              "fixed_version": {"type": "string", "minLength": 1, "maxLength": 255},
+              "severity": {"$ref": "#/$defs/severity"}
+            }
+          }
+        }
+      }
+    },
+    "license": {
+      "type": "object", "additionalProperties": false,
+      "required": ["unknown_present", "denied_present", "findings"],
+      "properties": {
+        "unknown_present": {"type": "boolean"},
+        "denied_present": {"type": "boolean"},
+        "findings": {
+          "type": "array", "maxItems": 10000,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["component", "spdx_expression", "policy_outcome"],
+            "properties": {
+              "component": {"type": "string", "minLength": 1, "maxLength": 512},
+              "purl": {"type": "string", "minLength": 1, "maxLength": 2048, "pattern": "^pkg:"},
+              "spdx_expression": {"type": "string", "minLength": 1, "maxLength": 2048},
+              "policy_outcome": {"type": "string", "enum": ["allowed", "denied", "unknown"]}
+            }
+          }
+        }
+      }
+    },
+    "evaluation": {
+      "type": "object", "additionalProperties": false,
+      "required": ["suite", "suite_version", "scenario_set_digest", "metrics", "overall_outcome"],
+      "properties": {
+        "suite": {"type": "string", "minLength": 1, "maxLength": 255},
+        "suite_version": {"type": "string", "minLength": 1, "maxLength": 255},
+        "scenario_set_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "metrics": {
+          "type": "array", "minItems": 1, "maxItems": 1024,
+          "items": {
+            "type": "object", "additionalProperties": false,
+            "required": ["name", "value", "unit", "threshold_operator", "threshold", "outcome"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1, "maxLength": 255},
+              "value": {"type": "number"},
+              "unit": {"type": "string", "minLength": 1, "maxLength": 64},
+              "threshold_operator": {"type": "string", "enum": ["lt", "lte", "eq", "gte", "gt"]},
+              "threshold": {"type": "number"},
+              "outcome": {"type": "string", "enum": ["pass", "fail", "warning", "unknown", "not-applicable"]}
+            }
+          }
+        },
+        "overall_outcome": {"type": "string", "enum": ["pass", "fail", "warning", "unknown", "not-applicable"]}
+      }
+    },
+    "sbom": {
+      "type": "object", "additionalProperties": false,
+      "required": ["format", "version", "component_count", "subject_matched"],
+      "properties": {
+        "format": {"type": "string", "enum": ["spdx-json", "cyclonedx-json"]},
+        "version": {"type": "string", "enum": ["2.3", "3.0", "1.7"]},
+        "component_count": {"type": "integer", "minimum": 0},
+        "subject_matched": {"type": "boolean"}
+      }
+    },
+    "humanReview": {
+      "type": "object", "additionalProperties": false,
+      "required": ["reviewer_principal", "review_type"],
+      "properties": {
+        "reviewer_principal": {"type": "string", "minLength": 1, "maxLength": 512},
+        "review_type": {"type": "string", "minLength": 1, "maxLength": 128}
+      }
+    },
+    "assertions": {
+      "type": "object", "additionalProperties": false,
+      "required": ["checks"],
+      "properties": {
+        "checks": {
+          "type": "array", "minItems": 1, "maxItems": 256,
+          "items": {
+            "type": "object", "additionalProperties": false, "required": ["name", "outcome"],
+            "properties": {
+              "name": {"type": "string", "minLength": 1, "maxLength": 255},
+              "outcome": {"type": "string", "enum": ["pass", "fail", "warning", "unknown", "not-applicable"]},
+              "reason_code": {"type": "string", "minLength": 1, "maxLength": 128}
+            }
+          }
+        }
+      }
+    }
+  }
+}

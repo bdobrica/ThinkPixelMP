@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/operation/v1",
+  "title": "ThinkPixelMP Operation v1",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "id", "kind", "state", "created_at", "updated_at"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+    "kind": {"type": "string", "enum": ["publication", "import", "evidence-verification", "resolution"]},
+    "state": {"type": "string", "enum": ["pending", "running", "succeeded", "failed", "cancelled"]},
+    "created_at": {"type": "string", "format": "date-time"},
+    "updated_at": {"type": "string", "format": "date-time"},
+    "resource": {"type": "string", "minLength": 1, "maxLength": 2048},
+    "reason_codes": {
+      "type": "array",
+      "maxItems": 64,
+      "uniqueItems": true,
+      "items": {"type": "string", "minLength": 1, "maxLength": 128}
+    }
+  }
+}

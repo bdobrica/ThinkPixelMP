@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/api-envelopes/v1",
+  "title": "ThinkPixelMP API envelopes v1",
+  "$defs": {
+    "publisherPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "resources-v1.schema.json#/$defs/publisher"}}}},
+    "namespacePage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "resources-v1.schema.json#/$defs/namespace"}}}},
+    "artifactPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "resources-v1.schema.json#/$defs/artifact"}}}},
+    "artifactVersionPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "artifact-version-v1.schema.json#/$defs/artifactVersion"}}}},
+    "evidencePage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "evidence-record-v1.schema.json"}}}},
+    "evidenceProducerPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "evidence-ingestion-v1.schema.json#/$defs/producer"}}}},
+    "catalogPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "resources-v1.schema.json#/$defs/catalog"}}}},
+    "catalogEntryPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "#/$defs/catalogEntry"}}}},
+    "revocationPage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "revocation-v1.schema.json"}}}},
+    "importSourcePage": {"$ref": "#/$defs/basePage", "properties": {"items": {"type": "array", "items": {"$ref": "federation-v1.schema.json#/$defs/source"}}}},
+    "basePage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {"items": {"type": "array"}, "next_cursor": {"type": "string", "minLength": 1, "maxLength": 4096}}
+    },
+    "catalogEntry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "catalog_id", "artifact_version_id", "artifact_digest", "promotion_decision_id", "state", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "catalog_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_version_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "artifact_digest": {"$ref": "common-v1.schema.json#/$defs/sha256Digest"},
+        "promotion_decision_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "state": {"type": "string", "enum": ["active", "removed"]},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    },
+    "actionRecord": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "tenant_id", "action", "resource_id", "actor_id", "reason_code", "created_at"],
+      "properties": {
+        "id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "action": {"type": "string", "minLength": 1, "maxLength": 128},
+        "resource_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "actor_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+        "reason_code": {"type": "string", "minLength": 1, "maxLength": 128},
+        "explanation": {"type": "string", "maxLength": 4096},
+        "created_at": {"type": "string", "format": "date-time"}
+      }
+    }
+  }
+}

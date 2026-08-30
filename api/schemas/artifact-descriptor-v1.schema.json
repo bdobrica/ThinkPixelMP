@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.thinkpixel.io/thinkpixelmp/artifact-descriptor/v1",
+  "title": "ThinkPixelMP ArtifactDescriptor v1",
+  "description": "Closed union of the five ThinkPixelMP artifact descriptor kinds.",
+  "oneOf": [
+    {"$ref": "skill-descriptor-v1.schema.json"},
+    {"$ref": "agent-runtime-v1.schema.json"},
+    {"$ref": "mcp-server-descriptor-v1.schema.json"},
+    {"$ref": "remote-agent-descriptor-v1.schema.json"},
+    {"$ref": "bundle-v1.schema.json"}
+  ],
+  "$defs": {
+    "coordinates": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "name", "version"],
+      "properties": {
+        "namespace": {"$ref": "common-v1.schema.json#/$defs/namespace"},
+        "name": {"$ref": "common-v1.schema.json#/$defs/artifactName"},
+        "version": {"$ref": "common-v1.schema.json#/$defs/semver"}
+      }
+    },
+    "requirements": {"$ref": "artifact-requirement-v1.schema.json"},
+    "dependencies": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {"$ref": "artifact-dependency-v1.schema.json"}
+    }
+  }
+}

@@ -23,6 +23,8 @@ flowchart TB
     AR -->|pull exact digest| OCI
     MP -->|discovery and onboarding metadata only| TG[ThinkPixelTG]
     TG -->|live tool capabilities remain TG/AG authority| AG
+    MP -->|immutable artifact references| WS[ThinkPixelWS]
+    MEM[ThinkPixelMEM] -->|reviewed procedure candidates as untrusted input| MP
 ```
 
 ## Ownership summary
@@ -37,5 +39,9 @@ flowchart TB
 | ThinkPixelAG | Run admission, capability grants, resource authority, runtime revocation policy | Marketplace artifact qualification |
 | ThinkPixelAR | Materialization and isolated execution of exact admitted digests | Marketplace search or authorization |
 | ThinkPixelTG | Live tool configuration, credentials, and tool execution | Marketplace qualification or Run admission |
+| ThinkPixelWS | Durable Workspace content, generations, and provenance | Marketplace eligibility or Run authorization |
+| ThinkPixelMEM | Governed learned memory and procedure-candidate provenance | Marketplace eligibility or executable authority |
 
 Cross-boundary inputs are untrusted unless a contract explicitly names an authenticated trusted producer and validates its scope.
+
+Components exchange stable identifiers through versioned public contracts. MP does not access another component's database or depend on another repository's internal implementation types; optional ThinkPixel integrations remain adapters around MP's domain and application boundaries.

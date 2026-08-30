@@ -13,5 +13,9 @@
 | AG ↔ MP | Authenticated service integration | MP qualifies exact digest; AG authorizes Run | No mutable fallback or authority expansion |
 | MP → AR | No direct runtime authority path | AR accepts exact digests through AG and independently verifies materialized digest | Reject alias/latest or mismatch |
 | MP → TG | Discovery/onboarding metadata only | TG owns live configuration and credentials; AG owns Run capability | No automatic tool enablement |
+| MP → WS | Immutable artifact and resolution references | WS owns Workspace membership, content, and provenance; AG owns Run authority | Workspace state cannot qualify or authorize an artifact |
+| MEM → MP | Learned procedure candidate and provenance are untrusted publication input | MP owns validation, evidence, policy, review, promotion, and catalog history | Never auto-promote or treat learned content as executable authority |
 
 ThinkPixelLLMGW and ThinkPixelGR have no direct MP authority relationship in the release candidate. Marketplace metadata cannot configure their privileged runtime policy.
+
+Every cross-component integration uses a versioned public wire contract and stable identifiers. No integration reads or writes another component's database or imports its internal implementation types.

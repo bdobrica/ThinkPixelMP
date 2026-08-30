@@ -2,3 +2,5 @@ node_modules/
 api/openapi/*.bundle.yaml
 api/openapi/*.bundle.json
 .redocly/
+/AUDIT_SUMMARY.md
+/ALIGNMENT.md

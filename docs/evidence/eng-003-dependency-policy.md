@@ -2,6 +2,8 @@
 
 Date: 2026-08-30
 
+Implementation commit: `965aefb` (`Enforce dependency source and license policy`)
+
 ## Outcome
 
 ThinkPixelMP now has a closed machine-readable `dependency-policy.json`, normative `docs/security/dependencies.md`, and a standard-library-only checker in `scripts/dependencycheck`.

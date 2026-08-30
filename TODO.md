@@ -21,66 +21,66 @@ Completion metadata format:
 
 ## Phase 0 — Decisions, threats, and contracts
 
-- [ ] ARC-001 Create `docs/` structure and ADR template covering context, decision, alternatives, consequences, security, compatibility, operations, and references.
-- [ ] ARC-002 Write system-context diagram covering publishers, clients, MP, PostgreSQL, OCI registries, signature infrastructure, scanners/evaluators, OPA, AG, AR, TG, federation sources, and evidence sinks.
-- [ ] ARC-003 Write threat model assuming malicious publishers, artifacts, OCI metadata/layers, dependencies, remote endpoints, federation sources, and forged evidence.
-- [ ] ARC-004 Define normative invariants: marketplace eligibility != Run authority; requirement != grant; installation != capability expansion; digest identity; evidence exact-subject binding.
-- [ ] ARC-005 Define trust-boundary table for MP, AG, AR, TG, LLMGW, GR, OCI registries, scanners, evaluators, and publishers.
-- [ ] ARC-006 Define artifact taxonomy: `skill`, `agent-runtime`, `mcp-server`, `remote-agent`, and `bundle`.
-- [ ] ARC-007 Define artifact classes `instructional`, `executable-local`, `remote-service`, and `composite`.
-- [ ] ARC-008 Define delivery-model vocabulary and relationships to artifact kinds.
-- [ ] ARC-009 Define Publisher domain model, verification states, suspension/revocation, and private-enterprise first-release semantics.
-- [ ] ARC-010 Define Namespace ownership/delegation rules and collision behavior.
-- [ ] ARC-011 Define immutable Artifact/ArtifactVersion identity rules including semantic version, mutable tags, re-publication, and digest conflicts.
-- [ ] ARC-012 Define OCI 1.1 distribution profile and media types required by ThinkPixel-specific artifacts.
-- [ ] ARC-013 Define OCI referrer/evidence attachment strategy and fallback for registries with incomplete referrer support.
-- [ ] ARC-014 Define Agent Skill OCI packaging profile while preserving Agent Skills semantics.
-- [ ] ARC-015 Define `agent-runtime` manifest including immutable image digest, adapter compatibility, Workspace/state paths, abstract runtime/network/capability requirements, and architecture.
-- [ ] ARC-016 Define MCP artifact descriptor profile and delivery-mode normalization.
-- [ ] ARC-017 Define remote-agent representation using immutable A2A Agent Card snapshots and endpoint metadata.
-- [ ] ARC-018 Define Bundle manifest and dependency semantics.
-- [ ] ARC-019 Define ArtifactRequirement schema for capabilities, runtime, network, model/protocol, and integration requirements.
-- [ ] ARC-020 Define ArtifactDependency schema including exact digest, exact version, semver range, source/catalog context, and optional/required edges.
-- [ ] ARC-021 Define deterministic dependency-resolution algorithm and tie-breaking rules.
-- [ ] ARC-022 Define ArtifactLock immutable graph schema and lock digest.
-- [ ] ARC-023 Define ArtifactResolution semantics, evidence snapshot behavior, and AG consumption contract.
-- [ ] ARC-024 Define EvidenceRecord schema, trusted producer identity, evidence categories, freshness, signature, normalized result, and raw-report references.
-- [ ] ARC-025 Define distinction between publisher declaration and trusted evidence.
-- [ ] ARC-026 Define signature-verification contract and Sigstore/Cosign identity/trust semantics.
-- [ ] ARC-027 Define SLSA-compatible provenance normalization.
-- [ ] ARC-028 Define SPDX/CycloneDX SBOM metadata normalization.
-- [ ] ARC-029 Define vulnerability/security/license evidence normalization and severity/freshness rules.
-- [ ] ARC-030 Define agent-evaluation evidence contract without embedding an evaluation engine into MP.
-- [ ] ARC-031 Define Catalog, CatalogEntry, catalog policy, and contextual eligibility semantics.
-- [ ] ARC-032 Define artifact lifecycle independently from catalog membership: active, deprecated, quarantined, revoked.
-- [ ] ARC-033 Define PromotionRequest/Review/Decision state machine, four-eyes controls, and idempotency.
-- [ ] ARC-034 Define deprecation semantics and replacement reference behavior.
-- [ ] ARC-035 Define quarantine semantics.
-- [ ] ARC-036 Define append-only digest revocation semantics, reason/severity, replacement, and downstream event behavior.
-- [ ] ARC-037 Define `CatalogPolicyEvaluator` typed contract and OPA/Rego reference adapter decision.
-- [ ] ARC-038 Define marketplace administrative authorization separately from catalog eligibility policy.
-- [ ] ARC-039 Define ImportSource/ImportRecord model and federation trust boundaries.
-- [ ] ARC-040 Define safe import rules for OCI, MCP Registry, A2A, and future Git/plugin sources.
-- [ ] ARC-041 Define central remote fetcher/SSRF security contract including address ranges, redirects, TLS, DNS resolution, response limits, and credential forwarding.
-- [ ] ARC-042 Define safe OCI/archive inspection limits for manifests, layers, files, decompression, path traversal, symlinks, and media types.
-- [ ] ARC-043 Define RegistryProvider interface independent of ORAS/library types.
-- [ ] ARC-044 Define registry credential ownership, scoping, and rotation requirements.
-- [ ] ARC-045 Define catalog OCI snapshot/export format and relationship to actual payload mirroring.
-- [ ] ARC-046 Define ThinkPixelMP-generated promotion attestation semantics without impersonating publisher identity.
-- [ ] ARC-047 Define OIDC/JWT authentication, tenant mapping, principal roles, and administrative authorization model.
-- [ ] ARC-048 Define PostgreSQL schema model, tenant scope, immutable records, transactional outbox, audit, and migration strategy.
-- [ ] ARC-049 Define API conventions: OpenAPI 3.1, RFC 7807, UUIDv7, pagination, idempotency, tracing, limits, and SSE.
-- [ ] ARC-050 Draft OpenAPI for discovery, publication, evidence, catalogs, promotion, resolution, lifecycle, import, and event APIs.
-- [ ] ARC-051 Define AG integration including immutable resolution consumption, caching/freshness responsibilities, and MP-unavailable behavior.
-- [ ] ARC-052 Define AG response to MP digest revocation without making MP authoritative for live Run state.
-- [ ] ARC-053 Define AR integration: exact digest only, no marketplace search/latest resolution at runtime.
-- [ ] ARC-054 Define TG integration: marketplace discovery/onboarding metadata cannot grant tool availability or credentials.
-- [ ] ARC-055 Define search/discovery semantics and explicitly separate browse ranking from authoritative resolution.
-- [ ] ARC-056 Define data-classification/redaction rules for artifact metadata, proprietary descriptors, evidence, registry credentials, signing material, audit, logs, and traces.
-- [ ] ARC-057 Define target SLOs/capacity assumptions for API, registry resolution, evidence verification, promotion, resolution, import, and events.
-- [ ] ARC-058 Define supported-version policy for Go, PostgreSQL, OCI Distribution, ORAS, Cosign/Sigstore, OPA, and supported descriptor standards.
-- [ ] ARC-059 Reconcile Phase 0 against the enterprise-agent blueprint and document any additions required for Marketplace invariants.
-- [ ] ARC-060 Validate all schemas/OpenAPI/docs and commit Phase 0 evidence.
+- [x] ARC-001 Create `docs/` structure and ADR template covering context, decision, alternatives, consequences, security, compatibility, operations, and references. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-002 Write system-context diagram covering publishers, clients, MP, PostgreSQL, OCI registries, signature infrastructure, scanners/evaluators, OPA, AG, AR, TG, federation sources, and evidence sinks. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-003 Write threat model assuming malicious publishers, artifacts, OCI metadata/layers, dependencies, remote endpoints, federation sources, and forged evidence. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-004 Define normative invariants: marketplace eligibility != Run authority; requirement != grant; installation != capability expansion; digest identity; evidence exact-subject binding. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-005 Define trust-boundary table for MP, AG, AR, TG, LLMGW, GR, OCI registries, scanners, evaluators, and publishers. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-006 Define artifact taxonomy: `skill`, `agent-runtime`, `mcp-server`, `remote-agent`, and `bundle`. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-007 Define artifact classes `instructional`, `executable-local`, `remote-service`, and `composite`. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-008 Define delivery-model vocabulary and relationships to artifact kinds. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-009 Define Publisher domain model, verification states, suspension/revocation, and private-enterprise first-release semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-010 Define Namespace ownership/delegation rules and collision behavior. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-011 Define immutable Artifact/ArtifactVersion identity rules including semantic version, mutable tags, re-publication, and digest conflicts. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-012 Define OCI 1.1 distribution profile and media types required by ThinkPixel-specific artifacts. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-013 Define OCI referrer/evidence attachment strategy and fallback for registries with incomplete referrer support. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-014 Define Agent Skill OCI packaging profile while preserving Agent Skills semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-015 Define `agent-runtime` manifest including immutable image digest, adapter compatibility, Workspace/state paths, abstract runtime/network/capability requirements, and architecture. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-016 Define MCP artifact descriptor profile and delivery-mode normalization. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-017 Define remote-agent representation using immutable A2A Agent Card snapshots and endpoint metadata. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-018 Define Bundle manifest and dependency semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-019 Define ArtifactRequirement schema for capabilities, runtime, network, model/protocol, and integration requirements. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-020 Define ArtifactDependency schema including exact digest, exact version, semver range, source/catalog context, and optional/required edges. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-021 Define deterministic dependency-resolution algorithm and tie-breaking rules. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-022 Define ArtifactLock immutable graph schema and lock digest. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-023 Define ArtifactResolution semantics, evidence snapshot behavior, and AG consumption contract. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-024 Define EvidenceRecord schema, trusted producer identity, evidence categories, freshness, signature, normalized result, and raw-report references. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-025 Define distinction between publisher declaration and trusted evidence. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-026 Define signature-verification contract and Sigstore/Cosign identity/trust semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-027 Define SLSA-compatible provenance normalization. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-028 Define SPDX/CycloneDX SBOM metadata normalization. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-029 Define vulnerability/security/license evidence normalization and severity/freshness rules. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-030 Define agent-evaluation evidence contract without embedding an evaluation engine into MP. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-031 Define Catalog, CatalogEntry, catalog policy, and contextual eligibility semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-032 Define artifact lifecycle independently from catalog membership: active, deprecated, quarantined, revoked. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-033 Define PromotionRequest/Review/Decision state machine, four-eyes controls, and idempotency. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-034 Define deprecation semantics and replacement reference behavior. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-035 Define quarantine semantics. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-036 Define append-only digest revocation semantics, reason/severity, replacement, and downstream event behavior. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-037 Define `CatalogPolicyEvaluator` typed contract and OPA/Rego reference adapter decision. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-038 Define marketplace administrative authorization separately from catalog eligibility policy. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-039 Define ImportSource/ImportRecord model and federation trust boundaries. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-040 Define safe import rules for OCI, MCP Registry, A2A, and future Git/plugin sources. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-041 Define central remote fetcher/SSRF security contract including address ranges, redirects, TLS, DNS resolution, response limits, and credential forwarding. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-042 Define safe OCI/archive inspection limits for manifests, layers, files, decompression, path traversal, symlinks, and media types. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-043 Define RegistryProvider interface independent of ORAS/library types. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-044 Define registry credential ownership, scoping, and rotation requirements. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-045 Define catalog OCI snapshot/export format and relationship to actual payload mirroring. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-046 Define ThinkPixelMP-generated promotion attestation semantics without impersonating publisher identity. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-047 Define OIDC/JWT authentication, tenant mapping, principal roles, and administrative authorization model. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-048 Define PostgreSQL schema model, tenant scope, immutable records, transactional outbox, audit, and migration strategy. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-049 Define API conventions: OpenAPI 3.1, RFC 7807, UUIDv7, pagination, idempotency, tracing, limits, and SSE. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-050 Draft OpenAPI for discovery, publication, evidence, catalogs, promotion, resolution, lifecycle, import, and event APIs. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-051 Define AG integration including immutable resolution consumption, caching/freshness responsibilities, and MP-unavailable behavior. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-052 Define AG response to MP digest revocation without making MP authoritative for live Run state. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-053 Define AR integration: exact digest only, no marketplace search/latest resolution at runtime. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-054 Define TG integration: marketplace discovery/onboarding metadata cannot grant tool availability or credentials. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-055 Define search/discovery semantics and explicitly separate browse ranking from authoritative resolution. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-056 Define data-classification/redaction rules for artifact metadata, proprietary descriptors, evidence, registry credentials, signing material, audit, logs, and traces. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-057 Define target SLOs/capacity assumptions for API, registry resolution, evidence verification, promotion, resolution, import, and events. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-058 Define supported-version policy for Go, PostgreSQL, OCI Distribution, ORAS, Cosign/Sigstore, OPA, and supported descriptor standards. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-059 Reconcile Phase 0 against the enterprise-agent blueprint and document any additions required for Marketplace invariants. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
+- [x] ARC-060 Validate all schemas/OpenAPI/docs and commit Phase 0 evidence. — completed 2026-08-30, commit aa6b571, evidence: docs/evidence/phase-0-exit.md; ./scripts/validate-phase0.sh
 
 ---
 

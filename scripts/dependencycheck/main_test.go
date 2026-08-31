@@ -24,7 +24,7 @@ func (runner fakeRunner) Output(_ context.Context, arguments ...string) ([]byte,
 
 func TestRepositoryPolicyAndModuleGraph(t *testing.T) {
 	root := repositoryRoot(t)
-	if err := check(context.Background(), root, testNow, goRunner{directory: root}); err != nil {
+	if err := check(context.Background(), root, time.Now().UTC(), goRunner{directory: root}); err != nil {
 		t.Fatalf("repository dependency policy: %v", err)
 	}
 }

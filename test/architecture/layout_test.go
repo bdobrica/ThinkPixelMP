@@ -72,6 +72,7 @@ func TestPlannedGoPackagesAreDiscoverable(t *testing.T) {
 		"internal/ports", "internal/ports/clock", "internal/ports/evidence", "internal/ports/identity",
 		"internal/ports/importer", "internal/ports/key", "internal/ports/policy", "internal/ports/provenance",
 		"internal/ports/registry", "internal/ports/signature", "internal/security", "internal/telemetry",
+		"internal/telemetry/logging", "internal/telemetry/metrics", "internal/telemetry/tracing",
 		"test/architecture", "test/contract", "test/e2e", "test/federation", "test/integration", "test/security",
 	}
 	for index := range want {
@@ -165,6 +166,6 @@ func goCommand(t *testing.T, arguments ...string) *exec.Cmd {
 	t.Helper()
 
 	command := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), arguments...)
-	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOMODCACHE="+t.TempDir())
+	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOFLAGS=-modcacherw", "GOMODCACHE="+t.TempDir())
 	return command
 }

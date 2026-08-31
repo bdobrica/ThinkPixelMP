@@ -3,7 +3,8 @@
   "private": true,
   "version": "0.0.0",
   "scripts": {
-    "validate:openapi": "redocly lint api/openapi/thinkpixelmp.yaml && redocly bundle api/openapi/thinkpixelmp.yaml --output /tmp/thinkpixelmp-openapi-bundle.yaml"
+    "generate:openapi": "./scripts/openapi.sh generate",
+    "validate:openapi": "./scripts/openapi.sh check"
   },
   "devDependencies": {
     "@redocly/cli": "2.46.2"

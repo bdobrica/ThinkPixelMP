@@ -8,8 +8,7 @@ for schema in api/schemas/*.json; do
   jq empty "$schema"
 done
 
-npx --no-install redocly lint api/openapi/thinkpixelmp.yaml
-npx --no-install redocly bundle api/openapi/thinkpixelmp.yaml --output /tmp/thinkpixelmp-openapi-bundle.yaml
+./scripts/openapi.sh check
 
 git diff --check
 

@@ -1,0 +1,6479 @@
+openapi: 3.1.0
+info:
+  title: ThinkPixelMP API
+  version: 0.1.0-phase0
+  description: Marketplace and agentic software supply-chain control-plane API.
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+servers:
+  - url: /v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Health
+    description: Process liveness and safe-serving readiness probes.
+  - name: Publishers
+    description: Tenant-local publisher identities and verification state.
+  - name: Namespaces
+    description: Hierarchical tenant namespaces and publisher delegations.
+  - name: Artifacts
+    description: Immutable artifact identities, versions, and ingestion.
+  - name: Evidence
+    description: Evidence producers, immutable reports, and normalized conclusions.
+  - name: Catalogs
+    description: Contextual catalogs, entries, and signed snapshots.
+  - name: Policies
+    description: Signed policy bundles and catalog activation.
+  - name: Promotions
+    description: Review-controlled promotion workflows.
+  - name: Resolutions
+    description: Deterministic dependency and policy resolution.
+  - name: Lifecycle
+    description: Deprecation, quarantine, revocation, and reconciliation actions.
+  - name: Federation
+    description: Explicit import sources and candidate import workflows.
+  - name: Operations
+    description: Asynchronous operation status and cancellation.
+  - name: Events
+    description: Tenant event stream delivery.
+paths:
+  /livez:
+    get:
+      tags:
+        - Health
+      operationId: getLiveness
+      summary: Report process liveness
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Health'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /readyz:
+    get:
+      tags:
+        - Health
+      operationId: getReadiness
+      summary: Report safe serving readiness
+      security: []
+      responses:
+        '200':
+          $ref: '#/components/responses/Health'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '503':
+          $ref: '#/components/responses/Problem'
+  /publishers:
+    get:
+      tags:
+        - Publishers
+      operationId: listPublishers
+      summary: List tenant publishers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/PublisherPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Publishers
+      operationId: createPublisher
+      summary: Create a tenant-local publisher
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PublisherCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/Publisher'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /publishers/{publisher_id}:
+    get:
+      tags:
+        - Publishers
+      operationId: getPublisher
+      summary: Get a publisher
+      parameters:
+        - $ref: '#/components/parameters/PublisherId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Publisher'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /publishers/{publisher_id}/state:
+    post:
+      tags:
+        - Publishers
+      operationId: changePublisherState
+      summary: Transition publisher verification state
+      parameters:
+        - $ref: '#/components/parameters/PublisherId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/PublisherState'
+      responses:
+        '200':
+          $ref: '#/components/responses/Publisher'
+        '409':
+          $ref: '#/components/responses/Problem'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+  /namespaces:
+    get:
+      tags:
+        - Namespaces
+      operationId: listNamespaces
+      summary: List tenant namespaces
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/NamespacePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Namespaces
+      operationId: createNamespace
+      summary: Create a tenant namespace
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/NamespaceCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/Namespace'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /namespaces/{namespace_id}:
+    get:
+      tags:
+        - Namespaces
+      operationId: getNamespace
+      summary: Get a namespace
+      parameters:
+        - $ref: '#/components/parameters/NamespaceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Namespace'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /namespaces/{namespace_id}/delegations:
+    post:
+      tags:
+        - Namespaces
+      operationId: createNamespaceDelegation
+      summary: Delegate a strict child namespace prefix
+      parameters:
+        - $ref: '#/components/parameters/NamespaceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/DelegationCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/Delegation'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /namespace-delegations/{delegation_id}/revoke:
+    post:
+      tags:
+        - Namespaces
+      operationId: revokeNamespaceDelegation
+      summary: Revoke a namespace delegation
+      parameters:
+        - $ref: '#/components/parameters/DelegationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/LifecycleReason'
+      responses:
+        '200':
+          $ref: '#/components/responses/Delegation'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+  /artifacts:
+    get:
+      tags:
+        - Artifacts
+      operationId: searchArtifacts
+      summary: Search and filter tenant artifacts
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: query
+          in: query
+          schema:
+            type: string
+            maxLength: 512
+      responses:
+        '200':
+          $ref: '#/components/responses/ArtifactPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Artifacts
+      operationId: createArtifact
+      summary: Create a logical artifact
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ArtifactCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/Artifact'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /artifacts/{artifact_id}:
+    get:
+      tags:
+        - Artifacts
+      operationId: getArtifact
+      summary: Get a logical artifact
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Artifact'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /artifacts/{artifact_id}/versions:
+    get:
+      tags:
+        - Artifacts
+      operationId: listArtifactVersions
+      summary: List immutable artifact versions
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/ArtifactVersionPage'
+        '404':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Artifacts
+      operationId: registerArtifactVersion
+      summary: Register and verify an immutable artifact version
+      parameters:
+        - $ref: '#/components/parameters/ArtifactId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ArtifactVersionRegister'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /artifact-versions/{artifact_version_id}:
+    get:
+      tags:
+        - Artifacts
+      operationId: getArtifactVersion
+      summary: Get an immutable artifact version
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ArtifactVersion'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /artifact-versions/{artifact_version_id}/evidence:
+    get:
+      tags:
+        - Evidence
+      operationId: listArtifactEvidence
+      summary: List evidence for an artifact version
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/EvidencePage'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /evidence:
+    post:
+      tags:
+        - Evidence
+      operationId: ingestEvidence
+      summary: Ingest and normalize digest-bound evidence
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/EvidenceIngest'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /evidence-producers:
+    get:
+      tags:
+        - Evidence
+      operationId: listEvidenceProducers
+      summary: List configured evidence producers
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/EvidenceProducerPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Evidence
+      operationId: createEvidenceProducer
+      summary: Configure a scoped evidence producer
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/EvidenceProducerCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/EvidenceProducer'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /evidence-producers/{evidence_producer_id}:
+    get:
+      tags:
+        - Evidence
+      operationId: getEvidenceProducer
+      summary: Get an evidence producer
+      parameters:
+        - $ref: '#/components/parameters/EvidenceProducerId'
+      responses:
+        '200':
+          $ref: '#/components/responses/EvidenceProducer'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /evidence-producers/{evidence_producer_id}/state:
+    post:
+      tags:
+        - Evidence
+      operationId: changeEvidenceProducerState
+      summary: Enable or disable an evidence producer
+      parameters:
+        - $ref: '#/components/parameters/EvidenceProducerId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/EvidenceProducerState'
+      responses:
+        '200':
+          $ref: '#/components/responses/EvidenceProducer'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+  /evidence/{evidence_id}:
+    get:
+      tags:
+        - Evidence
+      operationId: getEvidence
+      summary: Get an immutable evidence record
+      parameters:
+        - $ref: '#/components/parameters/EvidenceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Evidence'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /catalogs:
+    get:
+      tags:
+        - Catalogs
+      operationId: listCatalogs
+      summary: List tenant catalogs
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/CatalogPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Catalogs
+      operationId: createCatalog
+      summary: Create a tenant catalog
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/CatalogCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/Catalog'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /catalogs/{catalog_id}:
+    get:
+      tags:
+        - Catalogs
+      operationId: getCatalog
+      summary: Get a catalog
+      parameters:
+        - $ref: '#/components/parameters/CatalogId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Catalog'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /catalogs/{catalog_id}/entries:
+    get:
+      tags:
+        - Catalogs
+      operationId: listCatalogEntries
+      summary: List immutable catalog membership history
+      parameters:
+        - $ref: '#/components/parameters/CatalogId'
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/CatalogEntryPage'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /catalogs/{catalog_id}/policy-activations:
+    post:
+      tags:
+        - Policies
+      operationId: activateCatalogPolicy
+      summary: Activate an immutable policy bundle for a catalog
+      parameters:
+        - $ref: '#/components/parameters/CatalogId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/PolicyActivate'
+      responses:
+        '201':
+          $ref: '#/components/responses/PolicyActivation'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /policy-bundles:
+    post:
+      tags:
+        - Policies
+      operationId: registerPolicyBundle
+      summary: Register and verify an immutable policy bundle
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PolicyBundleRegister'
+      responses:
+        '201':
+          $ref: '#/components/responses/PolicyBundle'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /catalogs/{catalog_id}/snapshots:
+    post:
+      tags:
+        - Catalogs
+      operationId: createCatalogSnapshot
+      summary: Create a signed immutable catalog snapshot
+      parameters:
+        - $ref: '#/components/parameters/CatalogId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/SnapshotCreate'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /promotion-requests:
+    post:
+      tags:
+        - Promotions
+      operationId: createPromotionRequest
+      summary: Create an immutable promotion request snapshot
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PromotionRequestCreate'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /promotion-requests/{promotion_request_id}:
+    get:
+      tags:
+        - Promotions
+      operationId: getPromotionRequest
+      summary: Get a promotion request snapshot
+      parameters:
+        - $ref: '#/components/parameters/PromotionRequestId'
+      responses:
+        '200':
+          $ref: '#/components/responses/PromotionRequest'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /promotion-requests/{promotion_request_id}/reviews:
+    post:
+      tags:
+        - Promotions
+      operationId: submitPromotionReview
+      summary: Submit an authenticated promotion review
+      parameters:
+        - $ref: '#/components/parameters/PromotionRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PromotionReviewCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/PromotionReview'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /promotion-requests/{promotion_request_id}/decision:
+    post:
+      tags:
+        - Promotions
+      operationId: decidePromotion
+      summary: Trigger deterministic promotion decision
+      parameters:
+        - $ref: '#/components/parameters/PromotionRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PromotionDecisionTrigger'
+      responses:
+        '200':
+          $ref: '#/components/responses/PromotionDecision'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /promotion-requests/{promotion_request_id}/cancel:
+    post:
+      tags:
+        - Promotions
+      operationId: cancelPromotionRequest
+      summary: Cancel a non-terminal promotion request
+      parameters:
+        - $ref: '#/components/parameters/PromotionRequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/PromotionCancel'
+      responses:
+        '200':
+          $ref: '#/components/responses/PromotionRequest'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /resolutions:
+    post:
+      tags:
+        - Resolutions
+      operationId: createArtifactResolution
+      summary: Create or reuse a signed immutable resolution
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ResolutionCreate'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /resolutions/{resolution_id}:
+    get:
+      tags:
+        - Resolutions
+      operationId: getArtifactResolution
+      summary: Get an immutable resolution and current impact
+      parameters:
+        - $ref: '#/components/parameters/ResolutionId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Resolution'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /artifact-versions/{artifact_version_id}/deprecations:
+    post:
+      tags:
+        - Lifecycle
+      operationId: deprecateArtifactVersion
+      summary: Deprecate an artifact version immediately
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/Deprecate'
+      responses:
+        '201':
+          $ref: '#/components/responses/ActionRecord'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /artifact-versions/{artifact_version_id}/quarantines:
+    post:
+      tags:
+        - Lifecycle
+      operationId: quarantineArtifactVersion
+      summary: Quarantine an artifact version immediately
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/LifecycleReason'
+      responses:
+        '201':
+          $ref: '#/components/responses/ActionRecord'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /artifact-versions/{artifact_version_id}/quarantine-releases:
+    post:
+      tags:
+        - Lifecycle
+      operationId: releaseArtifactQuarantine
+      summary: Release an artifact version from quarantine
+      parameters:
+        - $ref: '#/components/parameters/ArtifactVersionId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/LifecycleReason'
+      responses:
+        '201':
+          $ref: '#/components/responses/ActionRecord'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /revocations:
+    get:
+      tags:
+        - Lifecycle
+      operationId: listRevocations
+      summary: List append-only digest revocations
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+        - name: digest
+          in: query
+          schema:
+            $ref: '#/components/schemas/sha256Digest'
+      responses:
+        '200':
+          $ref: '#/components/responses/RevocationPage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Lifecycle
+      operationId: revokeArtifactDigest
+      summary: Irreversibly revoke an artifact digest
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/Revoke'
+      responses:
+        '201':
+          $ref: '#/components/responses/Revocation'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /revocations/{revocation_id}/corrections:
+    post:
+      tags:
+        - Lifecycle
+      operationId: appendRevocationCorrection
+      summary: Append a non-restorative revocation correction
+      parameters:
+        - $ref: '#/components/parameters/RevocationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/RevocationCorrection'
+      responses:
+        '201':
+          $ref: '#/components/responses/ActionRecord'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /catalog-entries/{catalog_entry_id}/remove:
+    post:
+      tags:
+        - Catalogs
+      operationId: removeCatalogEntry
+      summary: Remove an entry from new catalog resolution
+      parameters:
+        - $ref: '#/components/parameters/CatalogEntryId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/LifecycleReason'
+      responses:
+        '200':
+          $ref: '#/components/responses/CatalogEntry'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+  /digest-states:
+    post:
+      tags:
+        - Lifecycle
+      operationId: reconcileDigestStates
+      summary: Reconcile authoritative lifecycle state for digests
+      requestBody:
+        $ref: '#/components/requestBodies/DigestReconcile'
+      responses:
+        '200':
+          $ref: '#/components/responses/DigestReconcile'
+        '400':
+          $ref: '#/components/responses/Problem'
+  /import-sources:
+    get:
+      tags:
+        - Federation
+      operationId: listImportSources
+      summary: List federation import sources
+      parameters:
+        - $ref: '#/components/parameters/Cursor'
+        - $ref: '#/components/parameters/PageSize'
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportSourcePage'
+        '401':
+          $ref: '#/components/responses/Problem'
+    post:
+      tags:
+        - Federation
+      operationId: createImportSource
+      summary: Create a disabled federation import source
+      parameters:
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ImportSourceCreate'
+      responses:
+        '201':
+          $ref: '#/components/responses/ImportSource'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /import-sources/{import_source_id}:
+    get:
+      tags:
+        - Federation
+      operationId: getImportSource
+      summary: Get an import source
+      parameters:
+        - $ref: '#/components/parameters/ImportSourceId'
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportSource'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /import-sources/{import_source_id}/state:
+    post:
+      tags:
+        - Federation
+      operationId: changeImportSourceState
+      summary: Enable, disable, or retire an import source
+      parameters:
+        - $ref: '#/components/parameters/ImportSourceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+        - $ref: '#/components/parameters/IfMatch'
+      requestBody:
+        $ref: '#/components/requestBodies/ImportSourceState'
+      responses:
+        '200':
+          $ref: '#/components/responses/ImportSource'
+        '412':
+          $ref: '#/components/responses/Problem'
+        '428':
+          $ref: '#/components/responses/Problem'
+  /import-sources/{import_source_id}/runs:
+    post:
+      tags:
+        - Federation
+      operationId: runImportSource
+      summary: Start a full or incremental import run
+      parameters:
+        - $ref: '#/components/parameters/ImportSourceId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ImportRun'
+      responses:
+        '202':
+          $ref: '#/components/responses/OperationAccepted'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /import-conflicts/{import_conflict_id}/resolution:
+    post:
+      tags:
+        - Federation
+      operationId: resolveImportConflict
+      summary: Resolve an immutable upstream version conflict
+      parameters:
+        - $ref: '#/components/parameters/ImportConflictId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/ImportConflictResolution'
+      responses:
+        '200':
+          $ref: '#/components/responses/ActionRecord'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /operations/{operation_id}:
+    get:
+      tags:
+        - Operations
+      operationId: getOperation
+      summary: Get asynchronous operation state
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+      responses:
+        '200':
+          $ref: '#/components/responses/Operation'
+        '404':
+          $ref: '#/components/responses/Problem'
+  /operations/{operation_id}/cancel:
+    post:
+      tags:
+        - Operations
+      operationId: cancelOperation
+      summary: Request best-effort cancellation of an operation
+      parameters:
+        - $ref: '#/components/parameters/OperationId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        $ref: '#/components/requestBodies/OperationCancel'
+      responses:
+        '200':
+          $ref: '#/components/responses/Operation'
+        '409':
+          $ref: '#/components/responses/Problem'
+  /events:
+    get:
+      tags:
+        - Events
+      operationId: streamEvents
+      summary: Stream resumable tenant marketplace events
+      parameters:
+        - name: Last-Event-ID
+          in: header
+          schema:
+            type: string
+            maxLength: 1024
+        - name: type
+          in: query
+          schema:
+            type: array
+            maxItems: 32
+            items:
+              type: string
+      responses:
+        '200':
+          description: Tenant-scoped Server-Sent Events stream.
+          content:
+            text/event-stream:
+              schema:
+                type: string
+        '409':
+          $ref: '#/components/responses/Problem'
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Cursor:
+      name: cursor
+      in: query
+      schema:
+        type: string
+        maxLength: 4096
+    PageSize:
+      name: page_size
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 200
+        default: 50
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 255
+    IfMatch:
+      name: If-Match
+      in: header
+      required: true
+      schema:
+        type: string
+        minLength: 3
+        maxLength: 255
+        pattern: ^"[^"\\r\\n]+"$
+    PublisherId:
+      name: publisher_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    NamespaceId:
+      name: namespace_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    DelegationId:
+      name: delegation_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    ArtifactId:
+      name: artifact_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    ArtifactVersionId:
+      name: artifact_version_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    EvidenceId:
+      name: evidence_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    EvidenceProducerId:
+      name: evidence_producer_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    RevocationId:
+      name: revocation_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    CatalogEntryId:
+      name: catalog_entry_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    CatalogId:
+      name: catalog_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    PromotionRequestId:
+      name: promotion_request_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    ResolutionId:
+      name: resolution_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    ImportSourceId:
+      name: import_source_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    ImportConflictId:
+      name: import_conflict_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+    OperationId:
+      name: operation_id
+      in: path
+      required: true
+      schema:
+        $ref: '#/components/schemas/uuidV7'
+  requestBodies:
+    PublisherCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/publisherCreate'
+    NamespaceCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/namespaceCreate'
+    ArtifactCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/artifactCreate'
+    ArtifactVersionRegister:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/register'
+    EvidenceIngest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ingest'
+    EvidenceProducerCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/producerCreate'
+    CatalogCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/catalogCreate'
+    PromotionRequestCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/requestCreate'
+    PromotionReviewCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/reviewCreate'
+    PromotionDecisionTrigger:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/decisionTrigger'
+    PromotionCancel:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/cancel'
+    PolicyBundleRegister:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/policyBundleRegister'
+    PolicyActivate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/policyActivate'
+    LifecycleReason:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/reason'
+    Deprecate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/deprecate'
+    Revoke:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/revoke'
+    RevocationCorrection:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/correction'
+    EvidenceProducerState:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/producerState'
+    ImportSourceCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/sourceCreate'
+    ImportSourceState:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/stateChange'
+    ImportRun:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/run'
+    ImportConflictResolution:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/conflictResolution'
+    ResolutionCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/create'
+    PublisherState:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/publisherState'
+    DelegationCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/delegationCreate'
+    SnapshotCreate:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/snapshotCreate'
+    DigestReconcile:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/digestReconcile'
+    OperationCancel:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/cancel'
+  responses:
+    PublisherPage:
+      description: Page of publishers.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/publisherPage'
+    NamespacePage:
+      description: Page of namespaces.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/namespacePage'
+    ArtifactPage:
+      description: Page of artifacts.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/artifactPage'
+    ArtifactVersionPage:
+      description: Page of artifact versions.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/artifactVersionPage'
+    EvidencePage:
+      description: Page of evidence records.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/evidencePage'
+    EvidenceProducerPage:
+      description: Page of evidence producers.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/evidenceProducerPage'
+    CatalogPage:
+      description: Page of catalogs.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/catalogPage'
+    CatalogEntryPage:
+      description: Page of catalog entries.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/catalogEntryPage'
+    RevocationPage:
+      description: Page of revocations.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/revocationPage'
+    ImportSourcePage:
+      description: Page of import sources.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/importSourcePage'
+    Publisher:
+      description: Publisher representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/publisher'
+    Namespace:
+      description: Namespace representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/namespace-2'
+    Artifact:
+      description: Artifact representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/artifact'
+    ArtifactVersion:
+      description: ArtifactVersion representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/artifactVersion'
+    EvidenceProducer:
+      description: EvidenceProducer representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/producer'
+    Evidence:
+      description: EvidenceRecord representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/evidence-record-v1.schema'
+    Catalog:
+      description: Catalog representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/catalog'
+    PromotionRequest:
+      description: PromotionRequest representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/promotionRequest'
+    PromotionReview:
+      description: PromotionReview representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/review'
+    PromotionDecision:
+      description: PromotionDecision representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/decision'
+    PolicyBundle:
+      description: PolicyBundle representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/policyBundle'
+    PolicyActivation:
+      description: PolicyActivation representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/policyActivation'
+    ImportSource:
+      description: ImportSource representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/source-2'
+    Resolution:
+      description: Signed immutable resolution with separate current impact.
+      content:
+        application/json:
+          schema:
+            type: object
+            additionalProperties: false
+            required:
+              - resolution
+              - current_impact
+            properties:
+              resolution:
+                $ref: '#/components/schemas/artifact-resolution-v1.schema'
+              current_impact:
+                $ref: '#/components/schemas/currentImpact'
+    Delegation:
+      description: NamespaceDelegation representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/delegation'
+    DigestReconcile:
+      description: Authoritative digest lifecycle state projection.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/digestReconcileResult'
+    CatalogEntry:
+      description: CatalogEntry representation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/catalogEntry'
+    ActionRecord:
+      description: Immutable administrative action record.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/actionRecord'
+    Revocation:
+      description: Immutable revocation record.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/revocation-v1.schema'
+    Health:
+      description: Health state.
+      content:
+        application/json:
+          schema:
+            type: object
+            required:
+              - status
+            properties:
+              status:
+                type: string
+            additionalProperties: false
+    OperationAccepted:
+      description: Long-running operation accepted.
+      headers:
+        Location:
+          required: true
+          schema:
+            type: string
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/operation-v1.schema'
+    Operation:
+      description: Operation resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/operation-v1.schema'
+    Problem:
+      description: RFC 7807 Problem Details.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/Problem'
+  schemas:
+    ArtifactDescriptor:
+      $ref: '#/components/schemas/artifact-descriptor-v1.schema'
+    ArtifactLock:
+      $ref: '#/components/schemas/artifact-lock-v1.schema'
+    CatalogSnapshot:
+      $ref: '#/components/schemas/catalog-snapshot-v1.schema'
+    EvidenceSummary:
+      $ref: '#/components/schemas/evidence-summary-v1.schema'
+    MarketplaceEvent:
+      $ref: '#/components/schemas/marketplace-event-v1.schema'
+    Problem:
+      type: object
+      additionalProperties: true
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri-reference
+        title:
+          type: string
+          maxLength: 256
+        status:
+          type: integer
+          minimum: 100
+          maximum: 599
+        detail:
+          type: string
+          maxLength: 2048
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+          maxLength: 128
+        request_id:
+          $ref: '#/components/schemas/uuidV7'
+    uuidV7:
+      type: string
+      format: uuid
+      pattern: ^[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$
+    dnsToken:
+      type: string
+      minLength: 1
+      maxLength: 63
+      pattern: ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$
+    publisher:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - slug
+        - state
+        - created_at
+      properties:
+        slug:
+          $ref: '#/components/schemas/dnsToken'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        state:
+          type: string
+          enum:
+            - claimed
+            - verified
+            - suspended
+            - revoked
+        created_at:
+          type: string
+          format: date-time
+    basePage:
+      type: object
+      additionalProperties: false
+      required:
+        - items
+      properties:
+        items:
+          type: array
+        next_cursor:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    publisherPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/publisher'
+    publisherCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - slug
+      properties:
+        slug:
+          $ref: '#/components/schemas/dnsToken'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+    publisherState:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - reason_code
+      properties:
+        state:
+          type: string
+          enum:
+            - verified
+            - suspended
+            - revoked
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        explanation:
+          type: string
+          maxLength: 4096
+    namespace:
+      type: string
+      minLength: 1
+      maxLength: 255
+      pattern: ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$
+    namespace-2:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - path
+        - owner_publisher_id
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        path:
+          $ref: '#/components/schemas/namespace'
+        owner_publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+        created_at:
+          type: string
+          format: date-time
+    namespacePage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/namespace-2'
+    namespaceCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - path
+        - owner_publisher_id
+      properties:
+        path:
+          $ref: '#/components/schemas/namespace'
+        owner_publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+    delegationCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - child_prefix
+        - publisher_id
+      properties:
+        child_prefix:
+          $ref: '#/components/schemas/namespace'
+        publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+    delegation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - namespace_id
+        - child_prefix
+        - publisher_id
+        - state
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        namespace_id:
+          $ref: '#/components/schemas/uuidV7'
+        child_prefix:
+          $ref: '#/components/schemas/namespace'
+        publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+        state:
+          type: string
+          enum:
+            - active
+            - revoked
+        created_at:
+          type: string
+          format: date-time
+    reason:
+      type: object
+      additionalProperties: false
+      required:
+        - reason_code
+      properties:
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+        explanation:
+          type: string
+          maxLength: 4096
+        evidence_ids:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/uuidV7'
+    artifactIdentity:
+      type: string
+      minLength: 3
+      maxLength: 319
+      pattern: ^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:/[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)+$
+    artifactKind:
+      type: string
+      enum:
+        - skill
+        - agent-runtime
+        - mcp-server
+        - remote-agent
+        - bundle
+    labels:
+      type: object
+      maxProperties: 64
+      propertyNames:
+        type: string
+        minLength: 1
+        maxLength: 128
+        pattern: ^[a-z0-9](?:[a-z0-9._/-]*[a-z0-9])?$
+      additionalProperties:
+        type: string
+        maxLength: 512
+    artifact:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - namespace_id
+        - identity
+        - name
+        - kind
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        namespace_id:
+          $ref: '#/components/schemas/uuidV7'
+        identity:
+          $ref: '#/components/schemas/artifactIdentity'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        kind:
+          $ref: '#/components/schemas/artifactKind'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+        homepage:
+          type: string
+          format: uri
+          maxLength: 2048
+        repository:
+          type: string
+          format: uri
+          maxLength: 2048
+        labels:
+          $ref: '#/components/schemas/labels'
+        created_at:
+          type: string
+          format: date-time
+    artifactPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/artifact'
+    artifactCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - namespace_id
+        - name
+        - kind
+      properties:
+        namespace_id:
+          $ref: '#/components/schemas/uuidV7'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        kind:
+          $ref: '#/components/schemas/artifactKind'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+        homepage:
+          type: string
+          format: uri
+          maxLength: 2048
+        repository:
+          type: string
+          format: uri
+          maxLength: 2048
+        labels:
+          $ref: '#/components/schemas/labels'
+    semver:
+      type: string
+      minLength: 5
+      maxLength: 255
+      pattern: ^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$
+    source:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - reference
+          properties:
+            kind:
+              const: oci
+            reference:
+              type: string
+              minLength: 1
+              maxLength: 2048
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - descriptor_reference
+            - endpoint
+          properties:
+            kind:
+              const: remote
+            descriptor_reference:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            endpoint:
+              type: string
+              format: uri
+              pattern: ^https://
+              maxLength: 2048
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - import_record_id
+          properties:
+            kind:
+              const: import-record
+            import_record_id:
+              $ref: '#/components/schemas/uuidV7'
+    sha256Digest:
+      type: string
+      pattern: ^sha256:[0-9a-f]{64}$
+    artifactVersion:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - artifact_id
+        - publisher_id
+        - version
+        - kind
+        - source
+        - resolved_digest
+        - descriptor_digest
+        - lifecycle
+        - registered_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_id:
+          $ref: '#/components/schemas/uuidV7'
+        publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+        version:
+          $ref: '#/components/schemas/semver'
+        kind:
+          $ref: '#/components/schemas/artifactKind'
+        source:
+          $ref: '#/components/schemas/source'
+        resolved_reference:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        resolved_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        descriptor_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        lifecycle:
+          type: string
+          enum:
+            - active
+            - deprecated
+            - quarantined
+            - revoked
+        registered_at:
+          type: string
+          format: date-time
+    artifactVersionPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/artifactVersion'
+    register:
+      type: object
+      additionalProperties: false
+      required:
+        - publisher_id
+        - version
+        - source
+      properties:
+        publisher_id:
+          $ref: '#/components/schemas/uuidV7'
+        version:
+          $ref: '#/components/schemas/semver'
+        expected_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        source:
+          $ref: '#/components/schemas/source'
+    operation-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/operation/v1
+      title: ThinkPixelMP Operation v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - id
+        - kind
+        - state
+        - created_at
+        - updated_at
+      properties:
+        schema_version:
+          const: 1
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        kind:
+          type: string
+          enum:
+            - publication
+            - import
+            - evidence-verification
+            - resolution
+        state:
+          type: string
+          enum:
+            - pending
+            - running
+            - succeeded
+            - failed
+            - cancelled
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        resource:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        reason_codes:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+    categoryPair:
+      type: object
+      required:
+        - category
+      properties:
+        category:
+          type: string
+        summary:
+          type: object
+    publisherVerification:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: publisher-verification
+        summary:
+          properties:
+            category:
+              const: publisher-verification
+    signatureVerification:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: signature-verification
+        summary:
+          properties:
+            category:
+              const: signature-verification
+    provenance:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: provenance
+        summary:
+          properties:
+            category:
+              const: provenance
+    sbom:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: sbom
+        summary:
+          properties:
+            category:
+              const: sbom
+    vulnerabilityScan:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: vulnerability-scan
+        summary:
+          properties:
+            category:
+              const: vulnerability-scan
+    malwareAnalysis:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: malware-analysis
+        summary:
+          properties:
+            category:
+              const: malware-analysis
+    staticAnalysis:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: static-analysis
+        summary:
+          properties:
+            category:
+              const: static-analysis
+    licenseAnalysis:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: license-analysis
+        summary:
+          properties:
+            category:
+              const: license-analysis
+    agentEvaluation:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: agent-evaluation
+        summary:
+          properties:
+            category:
+              const: agent-evaluation
+    humanReview:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: human-review
+        summary:
+          properties:
+            category:
+              const: human-review
+    runtimeCompatibility:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: runtime-compatibility
+        summary:
+          properties:
+            category:
+              const: runtime-compatibility
+    endpointOwnership:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: endpoint-ownership
+        summary:
+          properties:
+            category:
+              const: endpoint-ownership
+    endpointTls:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: endpoint-tls
+        summary:
+          properties:
+            category:
+              const: endpoint-tls
+    endpointHealth:
+      $ref: '#/components/schemas/categoryPair'
+      properties:
+        category:
+          const: endpoint-health
+        summary:
+          properties:
+            category:
+              const: endpoint-health
+    evaluationPass:
+      properties:
+        conclusion:
+          const: pass
+        summary:
+          properties:
+            details:
+              properties:
+                overall_outcome:
+                  const: pass
+    evaluationFail:
+      properties:
+        conclusion:
+          const: fail
+        summary:
+          properties:
+            details:
+              properties:
+                overall_outcome:
+                  const: fail
+    evaluationWarning:
+      properties:
+        conclusion:
+          const: warning
+        summary:
+          properties:
+            details:
+              properties:
+                overall_outcome:
+                  const: warning
+    evaluationUnknown:
+      properties:
+        conclusion:
+          const: unknown
+        summary:
+          properties:
+            details:
+              properties:
+                overall_outcome:
+                  const: unknown
+    evaluationNotApplicable:
+      properties:
+        conclusion:
+          const: not-applicable
+        summary:
+          properties:
+            details:
+              properties:
+                overall_outcome:
+                  const: not-applicable
+    subject:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - digest
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        digest:
+          $ref: '#/components/schemas/sha256Digest'
+    provenance-2:
+      type: object
+      additionalProperties: false
+      required:
+        - predicate_version
+        - subjects
+        - builder_identity
+        - build_type
+        - materials
+      properties:
+        predicate_version:
+          const: https://slsa.dev/provenance/v1
+        subjects:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items:
+            $ref: '#/components/schemas/subject'
+        builder_identity:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        build_type:
+          type: string
+          format: uri
+          maxLength: 2048
+        invocation_config_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        materials:
+          type: array
+          maxItems: 4096
+          items:
+            $ref: '#/components/schemas/subject'
+    severity:
+      type: string
+      enum:
+        - unknown
+        - none
+        - low
+        - medium
+        - high
+        - critical
+    vulnerability:
+      type: object
+      additionalProperties: false
+      required:
+        - finding_count
+        - maximum_severity
+        - counts
+        - findings
+      properties:
+        finding_count:
+          type: integer
+          minimum: 0
+        maximum_severity:
+          $ref: '#/components/schemas/severity'
+        counts:
+          type: object
+          additionalProperties: false
+          required:
+            - unknown
+            - none
+            - low
+            - medium
+            - high
+            - critical
+          properties:
+            unknown:
+              type: integer
+              minimum: 0
+            none:
+              type: integer
+              minimum: 0
+            low:
+              type: integer
+              minimum: 0
+            medium:
+              type: integer
+              minimum: 0
+            high:
+              type: integer
+              minimum: 0
+            critical:
+              type: integer
+              minimum: 0
+        findings:
+          type: array
+          maxItems: 10000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - package
+              - advisory_id
+              - severity
+            properties:
+              package:
+                type: string
+                minLength: 1
+                maxLength: 512
+              purl:
+                type: string
+                minLength: 1
+                maxLength: 2048
+                pattern: '^pkg:'
+              advisory_id:
+                type: string
+                minLength: 1
+                maxLength: 255
+              fixed_version:
+                type: string
+                minLength: 1
+                maxLength: 255
+              severity:
+                $ref: '#/components/schemas/severity'
+    license:
+      type: object
+      additionalProperties: false
+      required:
+        - unknown_present
+        - denied_present
+        - findings
+      properties:
+        unknown_present:
+          type: boolean
+        denied_present:
+          type: boolean
+        findings:
+          type: array
+          maxItems: 10000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - component
+              - spdx_expression
+              - policy_outcome
+            properties:
+              component:
+                type: string
+                minLength: 1
+                maxLength: 512
+              purl:
+                type: string
+                minLength: 1
+                maxLength: 2048
+                pattern: '^pkg:'
+              spdx_expression:
+                type: string
+                minLength: 1
+                maxLength: 2048
+              policy_outcome:
+                type: string
+                enum:
+                  - allowed
+                  - denied
+                  - unknown
+    evaluation:
+      type: object
+      additionalProperties: false
+      required:
+        - suite
+        - suite_version
+        - scenario_set_digest
+        - metrics
+        - overall_outcome
+      properties:
+        suite:
+          type: string
+          minLength: 1
+          maxLength: 255
+        suite_version:
+          type: string
+          minLength: 1
+          maxLength: 255
+        scenario_set_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        metrics:
+          type: array
+          minItems: 1
+          maxItems: 1024
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - name
+              - value
+              - unit
+              - threshold_operator
+              - threshold
+              - outcome
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 255
+              value:
+                type: number
+              unit:
+                type: string
+                minLength: 1
+                maxLength: 64
+              threshold_operator:
+                type: string
+                enum:
+                  - lt
+                  - lte
+                  - eq
+                  - gte
+                  - gt
+              threshold:
+                type: number
+              outcome:
+                type: string
+                enum:
+                  - pass
+                  - fail
+                  - warning
+                  - unknown
+                  - not-applicable
+        overall_outcome:
+          type: string
+          enum:
+            - pass
+            - fail
+            - warning
+            - unknown
+            - not-applicable
+    sbom-2:
+      type: object
+      additionalProperties: false
+      required:
+        - format
+        - version
+        - component_count
+        - subject_matched
+      properties:
+        format:
+          type: string
+          enum:
+            - spdx-json
+            - cyclonedx-json
+        version:
+          type: string
+          enum:
+            - '2.3'
+            - '3.0'
+            - '1.7'
+        component_count:
+          type: integer
+          minimum: 0
+        subject_matched:
+          type: boolean
+    humanReview-2:
+      type: object
+      additionalProperties: false
+      required:
+        - reviewer_principal
+        - review_type
+      properties:
+        reviewer_principal:
+          type: string
+          minLength: 1
+          maxLength: 512
+        review_type:
+          type: string
+          minLength: 1
+          maxLength: 128
+    assertions:
+      type: object
+      additionalProperties: false
+      required:
+        - checks
+      properties:
+        checks:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - name
+              - outcome
+            properties:
+              name:
+                type: string
+                minLength: 1
+                maxLength: 255
+              outcome:
+                type: string
+                enum:
+                  - pass
+                  - fail
+                  - warning
+                  - unknown
+                  - not-applicable
+              reason_code:
+                type: string
+                minLength: 1
+                maxLength: 128
+    provenanceBranch:
+      properties:
+        category:
+          const: provenance
+        details:
+          $ref: '#/components/schemas/provenance-2'
+    vulnerabilityBranch:
+      properties:
+        category:
+          const: vulnerability-scan
+        details:
+          $ref: '#/components/schemas/vulnerability'
+    licenseBranch:
+      properties:
+        category:
+          const: license-analysis
+        details:
+          $ref: '#/components/schemas/license'
+    evaluationBranch:
+      properties:
+        category:
+          const: agent-evaluation
+        details:
+          $ref: '#/components/schemas/evaluation'
+    sbomBranch:
+      properties:
+        category:
+          const: sbom
+        details:
+          $ref: '#/components/schemas/sbom-2'
+    humanReviewBranch:
+      properties:
+        category:
+          const: human-review
+        details:
+          $ref: '#/components/schemas/humanReview-2'
+    assertionBranch:
+      properties:
+        category:
+          enum:
+            - publisher-verification
+            - signature-verification
+            - malware-analysis
+            - static-analysis
+            - runtime-compatibility
+            - endpoint-ownership
+            - endpoint-tls
+            - endpoint-health
+        details:
+          $ref: '#/components/schemas/assertions'
+    evidence-summary-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/evidence-summary/v1
+      title: ThinkPixelMP normalized evidence summary v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - category
+        - details
+      properties:
+        schema_version:
+          const: 1
+        category:
+          type: string
+        details:
+          type: object
+      oneOf:
+        - $ref: '#/components/schemas/provenanceBranch'
+        - $ref: '#/components/schemas/vulnerabilityBranch'
+        - $ref: '#/components/schemas/licenseBranch'
+        - $ref: '#/components/schemas/evaluationBranch'
+        - $ref: '#/components/schemas/sbomBranch'
+        - $ref: '#/components/schemas/humanReviewBranch'
+        - $ref: '#/components/schemas/assertionBranch'
+      $defs:
+        provenanceBranch:
+          properties:
+            category:
+              const: provenance
+            details:
+              $ref: '#/components/schemas/provenance-2'
+        vulnerabilityBranch:
+          properties:
+            category:
+              const: vulnerability-scan
+            details:
+              $ref: '#/components/schemas/vulnerability'
+        licenseBranch:
+          properties:
+            category:
+              const: license-analysis
+            details:
+              $ref: '#/components/schemas/license'
+        evaluationBranch:
+          properties:
+            category:
+              const: agent-evaluation
+            details:
+              $ref: '#/components/schemas/evaluation'
+        sbomBranch:
+          properties:
+            category:
+              const: sbom
+            details:
+              $ref: '#/components/schemas/sbom-2'
+        humanReviewBranch:
+          properties:
+            category:
+              const: human-review
+            details:
+              $ref: '#/components/schemas/humanReview-2'
+        assertionBranch:
+          properties:
+            category:
+              enum:
+                - publisher-verification
+                - signature-verification
+                - malware-analysis
+                - static-analysis
+                - runtime-compatibility
+                - endpoint-ownership
+                - endpoint-tls
+                - endpoint-health
+            details:
+              $ref: '#/components/schemas/assertions'
+        subject:
+          type: object
+          additionalProperties: false
+          required:
+            - name
+            - digest
+          properties:
+            name:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+        provenance:
+          type: object
+          additionalProperties: false
+          required:
+            - predicate_version
+            - subjects
+            - builder_identity
+            - build_type
+            - materials
+          properties:
+            predicate_version:
+              const: https://slsa.dev/provenance/v1
+            subjects:
+              type: array
+              minItems: 1
+              maxItems: 256
+              items:
+                $ref: '#/components/schemas/subject'
+            builder_identity:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            build_type:
+              type: string
+              format: uri
+              maxLength: 2048
+            invocation_config_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            materials:
+              type: array
+              maxItems: 4096
+              items:
+                $ref: '#/components/schemas/subject'
+        severity:
+          type: string
+          enum:
+            - unknown
+            - none
+            - low
+            - medium
+            - high
+            - critical
+        vulnerability:
+          type: object
+          additionalProperties: false
+          required:
+            - finding_count
+            - maximum_severity
+            - counts
+            - findings
+          properties:
+            finding_count:
+              type: integer
+              minimum: 0
+            maximum_severity:
+              $ref: '#/components/schemas/severity'
+            counts:
+              type: object
+              additionalProperties: false
+              required:
+                - unknown
+                - none
+                - low
+                - medium
+                - high
+                - critical
+              properties:
+                unknown:
+                  type: integer
+                  minimum: 0
+                none:
+                  type: integer
+                  minimum: 0
+                low:
+                  type: integer
+                  minimum: 0
+                medium:
+                  type: integer
+                  minimum: 0
+                high:
+                  type: integer
+                  minimum: 0
+                critical:
+                  type: integer
+                  minimum: 0
+            findings:
+              type: array
+              maxItems: 10000
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - package
+                  - advisory_id
+                  - severity
+                properties:
+                  package:
+                    type: string
+                    minLength: 1
+                    maxLength: 512
+                  purl:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                    pattern: '^pkg:'
+                  advisory_id:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                  fixed_version:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                  severity:
+                    $ref: '#/components/schemas/severity'
+        license:
+          type: object
+          additionalProperties: false
+          required:
+            - unknown_present
+            - denied_present
+            - findings
+          properties:
+            unknown_present:
+              type: boolean
+            denied_present:
+              type: boolean
+            findings:
+              type: array
+              maxItems: 10000
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - component
+                  - spdx_expression
+                  - policy_outcome
+                properties:
+                  component:
+                    type: string
+                    minLength: 1
+                    maxLength: 512
+                  purl:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                    pattern: '^pkg:'
+                  spdx_expression:
+                    type: string
+                    minLength: 1
+                    maxLength: 2048
+                  policy_outcome:
+                    type: string
+                    enum:
+                      - allowed
+                      - denied
+                      - unknown
+        evaluation:
+          type: object
+          additionalProperties: false
+          required:
+            - suite
+            - suite_version
+            - scenario_set_digest
+            - metrics
+            - overall_outcome
+          properties:
+            suite:
+              type: string
+              minLength: 1
+              maxLength: 255
+            suite_version:
+              type: string
+              minLength: 1
+              maxLength: 255
+            scenario_set_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            metrics:
+              type: array
+              minItems: 1
+              maxItems: 1024
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - name
+                  - value
+                  - unit
+                  - threshold_operator
+                  - threshold
+                  - outcome
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                  value:
+                    type: number
+                  unit:
+                    type: string
+                    minLength: 1
+                    maxLength: 64
+                  threshold_operator:
+                    type: string
+                    enum:
+                      - lt
+                      - lte
+                      - eq
+                      - gte
+                      - gt
+                  threshold:
+                    type: number
+                  outcome:
+                    type: string
+                    enum:
+                      - pass
+                      - fail
+                      - warning
+                      - unknown
+                      - not-applicable
+            overall_outcome:
+              type: string
+              enum:
+                - pass
+                - fail
+                - warning
+                - unknown
+                - not-applicable
+        sbom:
+          type: object
+          additionalProperties: false
+          required:
+            - format
+            - version
+            - component_count
+            - subject_matched
+          properties:
+            format:
+              type: string
+              enum:
+                - spdx-json
+                - cyclonedx-json
+            version:
+              type: string
+              enum:
+                - '2.3'
+                - '3.0'
+                - '1.7'
+            component_count:
+              type: integer
+              minimum: 0
+            subject_matched:
+              type: boolean
+        humanReview:
+          type: object
+          additionalProperties: false
+          required:
+            - reviewer_principal
+            - review_type
+          properties:
+            reviewer_principal:
+              type: string
+              minLength: 1
+              maxLength: 512
+            review_type:
+              type: string
+              minLength: 1
+              maxLength: 128
+        assertions:
+          type: object
+          additionalProperties: false
+          required:
+            - checks
+          properties:
+            checks:
+              type: array
+              minItems: 1
+              maxItems: 256
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - name
+                  - outcome
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                  outcome:
+                    type: string
+                    enum:
+                      - pass
+                      - fail
+                      - warning
+                      - unknown
+                      - not-applicable
+                  reason_code:
+                    type: string
+                    minLength: 1
+                    maxLength: 128
+    evidence-record-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/evidence-record/v1
+      title: ThinkPixelMP EvidenceRecord v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - id
+        - tenant_id
+        - artifact_version_id
+        - subject_digest
+        - category
+        - producer
+        - producer_event_id
+        - report
+        - ingestion_status
+        - created_at
+        - observed_at
+        - ingested_at
+      properties:
+        schema_version:
+          const: 1
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        subject_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        category:
+          type: string
+          enum:
+            - publisher-verification
+            - signature-verification
+            - provenance
+            - sbom
+            - vulnerability-scan
+            - malware-analysis
+            - static-analysis
+            - license-analysis
+            - agent-evaluation
+            - human-review
+            - runtime-compatibility
+            - endpoint-ownership
+            - endpoint-tls
+            - endpoint-health
+        producer:
+          type: object
+          additionalProperties: false
+          required:
+            - id
+            - version
+          properties:
+            id:
+              $ref: '#/components/schemas/uuidV7'
+            version:
+              type: string
+              minLength: 1
+              maxLength: 255
+        producer_event_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        report:
+          type: object
+          additionalProperties: false
+          required:
+            - digest
+            - media_type
+            - size_bytes
+            - reference
+          properties:
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            media_type:
+              type: string
+              minLength: 1
+              maxLength: 255
+            size_bytes:
+              type: integer
+              minimum: 0
+            reference:
+              type: string
+              minLength: 1
+              maxLength: 2048
+        ingestion_status:
+          type: string
+          enum:
+            - accepted
+            - rejected
+            - processing-error
+        conclusion:
+          type: string
+          enum:
+            - pass
+            - fail
+            - warning
+            - unknown
+            - not-applicable
+        created_at:
+          type: string
+          format: date-time
+        observed_at:
+          type: string
+          format: date-time
+        ingested_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+        normalizer_profile:
+          type: string
+          minLength: 1
+          maxLength: 255
+        summary:
+          $ref: '#/components/schemas/evidence-summary-v1.schema'
+        reason_codes:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+      allOf:
+        - if:
+            properties:
+              ingestion_status:
+                const: accepted
+          then:
+            required:
+              - conclusion
+              - normalizer_profile
+              - summary
+          else:
+            not:
+              required:
+                - conclusion
+        - oneOf:
+            - $ref: '#/components/schemas/publisherVerification'
+            - $ref: '#/components/schemas/signatureVerification'
+            - $ref: '#/components/schemas/provenance'
+            - $ref: '#/components/schemas/sbom'
+            - $ref: '#/components/schemas/vulnerabilityScan'
+            - $ref: '#/components/schemas/malwareAnalysis'
+            - $ref: '#/components/schemas/staticAnalysis'
+            - $ref: '#/components/schemas/licenseAnalysis'
+            - $ref: '#/components/schemas/agentEvaluation'
+            - $ref: '#/components/schemas/humanReview'
+            - $ref: '#/components/schemas/runtimeCompatibility'
+            - $ref: '#/components/schemas/endpointOwnership'
+            - $ref: '#/components/schemas/endpointTls'
+            - $ref: '#/components/schemas/endpointHealth'
+        - if:
+            properties:
+              ingestion_status:
+                const: accepted
+              category:
+                const: agent-evaluation
+            required:
+              - ingestion_status
+              - category
+          then:
+            oneOf:
+              - $ref: '#/components/schemas/evaluationPass'
+              - $ref: '#/components/schemas/evaluationFail'
+              - $ref: '#/components/schemas/evaluationWarning'
+              - $ref: '#/components/schemas/evaluationUnknown'
+              - $ref: '#/components/schemas/evaluationNotApplicable'
+      $defs:
+        publisherVerification:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: publisher-verification
+            summary:
+              properties:
+                category:
+                  const: publisher-verification
+        signatureVerification:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: signature-verification
+            summary:
+              properties:
+                category:
+                  const: signature-verification
+        provenance:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: provenance
+            summary:
+              properties:
+                category:
+                  const: provenance
+        sbom:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: sbom
+            summary:
+              properties:
+                category:
+                  const: sbom
+        vulnerabilityScan:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: vulnerability-scan
+            summary:
+              properties:
+                category:
+                  const: vulnerability-scan
+        malwareAnalysis:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: malware-analysis
+            summary:
+              properties:
+                category:
+                  const: malware-analysis
+        staticAnalysis:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: static-analysis
+            summary:
+              properties:
+                category:
+                  const: static-analysis
+        licenseAnalysis:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: license-analysis
+            summary:
+              properties:
+                category:
+                  const: license-analysis
+        agentEvaluation:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: agent-evaluation
+            summary:
+              properties:
+                category:
+                  const: agent-evaluation
+        humanReview:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: human-review
+            summary:
+              properties:
+                category:
+                  const: human-review
+        runtimeCompatibility:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: runtime-compatibility
+            summary:
+              properties:
+                category:
+                  const: runtime-compatibility
+        endpointOwnership:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: endpoint-ownership
+            summary:
+              properties:
+                category:
+                  const: endpoint-ownership
+        endpointTls:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: endpoint-tls
+            summary:
+              properties:
+                category:
+                  const: endpoint-tls
+        endpointHealth:
+          $ref: '#/components/schemas/categoryPair'
+          properties:
+            category:
+              const: endpoint-health
+            summary:
+              properties:
+                category:
+                  const: endpoint-health
+        evaluationPass:
+          properties:
+            conclusion:
+              const: pass
+            summary:
+              properties:
+                details:
+                  properties:
+                    overall_outcome:
+                      const: pass
+        evaluationFail:
+          properties:
+            conclusion:
+              const: fail
+            summary:
+              properties:
+                details:
+                  properties:
+                    overall_outcome:
+                      const: fail
+        evaluationWarning:
+          properties:
+            conclusion:
+              const: warning
+            summary:
+              properties:
+                details:
+                  properties:
+                    overall_outcome:
+                      const: warning
+        evaluationUnknown:
+          properties:
+            conclusion:
+              const: unknown
+            summary:
+              properties:
+                details:
+                  properties:
+                    overall_outcome:
+                      const: unknown
+        evaluationNotApplicable:
+          properties:
+            conclusion:
+              const: not-applicable
+            summary:
+              properties:
+                details:
+                  properties:
+                    overall_outcome:
+                      const: not-applicable
+        categoryPair:
+          type: object
+          required:
+            - category
+          properties:
+            category:
+              type: string
+            summary:
+              type: object
+    evidencePage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/evidence-record-v1.schema'
+    category:
+      type: string
+      enum:
+        - publisher-verification
+        - signature-verification
+        - provenance
+        - sbom
+        - vulnerability-scan
+        - malware-analysis
+        - static-analysis
+        - license-analysis
+        - agent-evaluation
+        - human-review
+        - runtime-compatibility
+        - endpoint-ownership
+        - endpoint-tls
+        - endpoint-health
+    report:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - reference
+            - digest
+            - media_type
+            - size_bytes
+          properties:
+            kind:
+              const: oci
+            reference:
+              type: string
+              minLength: 1
+              maxLength: 2048
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            media_type:
+              type: string
+              minLength: 1
+              maxLength: 255
+            size_bytes:
+              type: integer
+              minimum: 1
+        - type: object
+          additionalProperties: false
+          required:
+            - kind
+            - store
+            - object_key
+            - digest
+            - media_type
+            - size_bytes
+          properties:
+            kind:
+              const: object-store
+            store:
+              $ref: '#/components/schemas/dnsToken'
+            object_key:
+              type: string
+              minLength: 1
+              maxLength: 1024
+              pattern: ^[^\u0000\r\n]+$
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            media_type:
+              type: string
+              minLength: 1
+              maxLength: 255
+            size_bytes:
+              type: integer
+              minimum: 1
+    ingest:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_version_id
+        - subject_digest
+        - category
+        - producer_event_id
+        - report
+        - created_at
+        - observed_at
+      properties:
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        subject_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        category:
+          $ref: '#/components/schemas/category'
+        producer_event_id:
+          type: string
+          minLength: 1
+          maxLength: 255
+        report:
+          $ref: '#/components/schemas/report'
+        created_at:
+          type: string
+          format: date-time
+        observed_at:
+          type: string
+          format: date-time
+        expires_at:
+          type: string
+          format: date-time
+    authentication:
+      type: object
+      additionalProperties: false
+      required:
+        - mode
+        - identity
+      properties:
+        mode:
+          type: string
+          enum:
+            - oidc
+            - mtls
+            - signed-attestation
+        identity:
+          type: string
+          minLength: 1
+          maxLength: 512
+    producer:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - name
+        - allowed_categories
+        - authentication
+        - state
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        allowed_categories:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/category'
+        authentication:
+          $ref: '#/components/schemas/authentication'
+        state:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        created_at:
+          type: string
+          format: date-time
+    evidenceProducerPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/producer'
+    producerCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - allowed_categories
+        - authentication
+      properties:
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        allowed_categories:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/category'
+        authentication:
+          type: object
+          additionalProperties: false
+          required:
+            - mode
+            - identity
+          properties:
+            mode:
+              type: string
+              enum:
+                - oidc
+                - mtls
+                - signed-attestation
+            identity:
+              type: string
+              minLength: 1
+              maxLength: 512
+    producerState:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - reason_code
+      properties:
+        state:
+          type: string
+          enum:
+            - enabled
+            - disabled
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        explanation:
+          type: string
+          maxLength: 4096
+    catalog:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - name
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+        active_policy_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        created_at:
+          type: string
+          format: date-time
+    catalogPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/catalog'
+    catalogCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+      properties:
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        display_name:
+          type: string
+          minLength: 1
+          maxLength: 256
+        description:
+          type: string
+          maxLength: 4096
+    catalogEntry:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - catalog_id
+        - artifact_version_id
+        - artifact_digest
+        - promotion_decision_id
+        - state
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        promotion_decision_id:
+          $ref: '#/components/schemas/uuidV7'
+        state:
+          type: string
+          enum:
+            - active
+            - removed
+        created_at:
+          type: string
+          format: date-time
+    catalogEntryPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/catalogEntry'
+    policyActivate:
+      type: object
+      additionalProperties: false
+      required:
+        - policy_bundle_id
+      properties:
+        policy_bundle_id:
+          $ref: '#/components/schemas/uuidV7'
+    policyActivation:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - catalog_id
+        - policy_bundle_id
+        - policy_digest
+        - actor_id
+        - activated_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        policy_bundle_id:
+          $ref: '#/components/schemas/uuidV7'
+        policy_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        actor_id:
+          $ref: '#/components/schemas/uuidV7'
+        activated_at:
+          type: string
+          format: date-time
+    policyBundleRegister:
+      type: object
+      additionalProperties: false
+      required:
+        - reference
+        - expected_digest
+        - entrypoint
+      properties:
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        expected_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        entrypoint:
+          type: string
+          minLength: 1
+          maxLength: 255
+          pattern: ^[a-z0-9](?:[a-z0-9_./-]*[a-z0-9])?$
+    policyBundle:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - reference
+        - digest
+        - entrypoint
+        - trust
+        - registered_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        reference:
+          type: string
+          minLength: 1
+          maxLength: 2048
+        digest:
+          $ref: '#/components/schemas/sha256Digest'
+        entrypoint:
+          type: string
+          minLength: 1
+          maxLength: 255
+        trust:
+          type: string
+          enum:
+            - trusted
+            - untrusted
+        registered_at:
+          type: string
+          format: date-time
+    snapshotCreate:
+      type: object
+      additionalProperties: false
+      properties:
+        parent_snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    requestCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - catalog_id
+        - artifact_version_id
+      properties:
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        selected_optional_dependencies:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/dnsToken'
+        additional_evidence_ids:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/uuidV7'
+    promotionRequest:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - catalog_id
+        - artifact_version_id
+        - artifact_digest
+        - lock_digest
+        - policy_digest
+        - evidence_snapshot_digest
+        - requester_id
+        - state
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        lock_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        policy_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        evidence_snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        requester_id:
+          $ref: '#/components/schemas/uuidV7'
+        state:
+          type: string
+          enum:
+            - submitted
+            - evaluating
+            - awaiting-review
+            - approved
+            - denied
+            - cancelled
+        created_at:
+          type: string
+          format: date-time
+    reviewCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - decision
+        - reason
+      properties:
+        decision:
+          type: string
+          enum:
+            - approve
+            - reject
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    review:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - promotion_request_id
+        - reviewer_id
+        - decision
+        - reason
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        promotion_request_id:
+          $ref: '#/components/schemas/uuidV7'
+        reviewer_id:
+          $ref: '#/components/schemas/uuidV7'
+        decision:
+          type: string
+          enum:
+            - approve
+            - reject
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4096
+        created_at:
+          type: string
+          format: date-time
+    decisionTrigger:
+      type: object
+      additionalProperties: false
+      maxProperties: 0
+    decision:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - promotion_request_id
+        - outcome
+        - policy_digest
+        - lock_digest
+        - evidence_snapshot_digest
+        - decided_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        promotion_request_id:
+          $ref: '#/components/schemas/uuidV7'
+        outcome:
+          type: string
+          enum:
+            - approved
+            - denied
+        policy_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        lock_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        evidence_snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        decided_at:
+          type: string
+          format: date-time
+    cancel:
+      type: object
+      additionalProperties: false
+      required:
+        - reason
+      properties:
+        reason:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    create:
+      type: object
+      additionalProperties: false
+      required:
+        - catalog_id
+        - artifact_id
+        - selector
+      properties:
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_id:
+          $ref: '#/components/schemas/uuidV7'
+        selector:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - artifact_version_id
+              properties:
+                artifact_version_id:
+                  $ref: '#/components/schemas/uuidV7'
+            - type: object
+              additionalProperties: false
+              required:
+                - version
+              properties:
+                version:
+                  $ref: '#/components/schemas/semver'
+            - type: object
+              additionalProperties: false
+              required:
+                - range
+              properties:
+                range:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+        selected_optional_dependencies:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/dnsToken'
+    node:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact
+        - version
+        - digest
+        - kind
+        - lifecycle
+      properties:
+        artifact:
+          $ref: '#/components/schemas/artifactIdentity'
+        version:
+          $ref: '#/components/schemas/semver'
+        digest:
+          $ref: '#/components/schemas/sha256Digest'
+        kind:
+          type: string
+          enum:
+            - skill
+            - agent-runtime
+            - mcp-server
+            - remote-agent
+            - bundle
+        lifecycle:
+          type: string
+          enum:
+            - active
+            - deprecated
+            - quarantined
+            - revoked
+        requirement_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    artifact-resolution-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/artifact-resolution/v1
+      title: ThinkPixelMP ArtifactResolution v1
+      $defs:
+        create:
+          type: object
+          additionalProperties: false
+          required:
+            - catalog_id
+            - artifact_id
+            - selector
+          properties:
+            catalog_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_id:
+              $ref: '#/components/schemas/uuidV7'
+            selector:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - artifact_version_id
+                  properties:
+                    artifact_version_id:
+                      $ref: '#/components/schemas/uuidV7'
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - version
+                  properties:
+                    version:
+                      $ref: '#/components/schemas/semver'
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - range
+                  properties:
+                    range:
+                      type: string
+                      minLength: 1
+                      maxLength: 255
+            selected_optional_dependencies:
+              type: array
+              maxItems: 256
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/dnsToken'
+        currentImpact:
+          type: object
+          additionalProperties: false
+          required:
+            - affected
+            - observed_at
+            - event_cursor
+            - nodes
+          properties:
+            affected:
+              type: boolean
+            observed_at:
+              type: string
+              format: date-time
+            event_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            nodes:
+              type: array
+              maxItems: 10000
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - digest
+                  - state
+                properties:
+                  digest:
+                    $ref: '#/components/schemas/sha256Digest'
+                  state:
+                    type: string
+                    enum:
+                      - quarantined
+                      - revoked
+        node:
+          type: object
+          additionalProperties: false
+          required:
+            - artifact
+            - version
+            - digest
+            - kind
+            - lifecycle
+          properties:
+            artifact:
+              $ref: '#/components/schemas/artifactIdentity'
+            version:
+              $ref: '#/components/schemas/semver'
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            kind:
+              type: string
+              enum:
+                - skill
+                - agent-runtime
+                - mcp-server
+                - remote-agent
+                - bundle
+            lifecycle:
+              type: string
+              enum:
+                - active
+                - deprecated
+                - quarantined
+                - revoked
+            requirement_digest:
+              $ref: '#/components/schemas/sha256Digest'
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - resolution_algorithm
+        - input_digest
+        - id
+        - tenant_id
+        - catalog_id
+        - root_digest
+        - lock_digest
+        - policy_digest
+        - evidence_snapshot_digest
+        - created_at
+        - lifecycle_observed_at
+        - event_cursor
+        - resolution_digest
+        - signing_identity
+      properties:
+        schema_version:
+          const: 1
+        resolution_algorithm:
+          const: thinkpixelmp-resolution-v1
+        input_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        root_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        lock_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        policy_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        evidence_snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        nodes:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/node'
+        created_at:
+          type: string
+          format: date-time
+        lifecycle_observed_at:
+          type: string
+          format: date-time
+        event_cursor:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        resolution_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        signing_identity:
+          type: string
+          minLength: 1
+          maxLength: 512
+        signature_reference:
+          type: string
+          minLength: 1
+          maxLength: 2048
+    currentImpact:
+      type: object
+      additionalProperties: false
+      required:
+        - affected
+        - observed_at
+        - event_cursor
+        - nodes
+      properties:
+        affected:
+          type: boolean
+        observed_at:
+          type: string
+          format: date-time
+        event_cursor:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        nodes:
+          type: array
+          maxItems: 10000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - digest
+              - state
+            properties:
+              digest:
+                $ref: '#/components/schemas/sha256Digest'
+              state:
+                type: string
+                enum:
+                  - quarantined
+                  - revoked
+    deprecate:
+      type: object
+      additionalProperties: false
+      required:
+        - reason_code
+      properties:
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+        explanation:
+          type: string
+          maxLength: 4096
+        evidence_ids:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/uuidV7'
+        replacement_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    actionRecord:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - action
+        - resource_id
+        - actor_id
+        - reason_code
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        action:
+          type: string
+          minLength: 1
+          maxLength: 128
+        resource_id:
+          $ref: '#/components/schemas/uuidV7'
+        actor_id:
+          $ref: '#/components/schemas/uuidV7'
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        explanation:
+          type: string
+          maxLength: 4096
+        created_at:
+          type: string
+          format: date-time
+    revocation-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/revocation/v1
+      title: ThinkPixelMP Revocation v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - id
+        - tenant_id
+        - artifact_version_id
+        - subject_digest
+        - severity
+        - reason_code
+        - effective_at
+        - administrator_id
+      properties:
+        schema_version:
+          const: 1
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        subject_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        severity:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+        explanation:
+          type: string
+          maxLength: 4096
+        effective_at:
+          type: string
+          format: date-time
+        administrator_id:
+          $ref: '#/components/schemas/uuidV7'
+        evidence_ids:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/uuidV7'
+        replacement_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    revocationPage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/revocation-v1.schema'
+    revoke:
+      type: object
+      additionalProperties: false
+      required:
+        - artifact_version_id
+        - subject_digest
+        - severity
+        - reason_code
+      properties:
+        artifact_version_id:
+          $ref: '#/components/schemas/uuidV7'
+        subject_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        severity:
+          type: string
+          enum:
+            - low
+            - medium
+            - high
+            - critical
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+        explanation:
+          type: string
+          maxLength: 4096
+        evidence_ids:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/uuidV7'
+        replacement_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    correction:
+      type: object
+      additionalProperties: false
+      required:
+        - reason_code
+        - explanation
+      properties:
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+          pattern: ^[a-z0-9](?:[a-z0-9._-]*[a-z0-9])?$
+        explanation:
+          type: string
+          minLength: 1
+          maxLength: 4096
+    digestReconcile:
+      type: object
+      additionalProperties: false
+      required:
+        - digests
+      properties:
+        digests:
+          type: array
+          minItems: 1
+          maxItems: 1000
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/sha256Digest'
+    digestReconcileResult:
+      type: object
+      additionalProperties: false
+      required:
+        - observed_at
+        - event_cursor
+        - items
+      properties:
+        observed_at:
+          type: string
+          format: date-time
+        event_cursor:
+          type: string
+          minLength: 1
+          maxLength: 1024
+        items:
+          type: array
+          maxItems: 1000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - digest
+              - state
+            properties:
+              digest:
+                $ref: '#/components/schemas/sha256Digest'
+              state:
+                type: string
+                enum:
+                  - active
+                  - deprecated
+                  - quarantined
+                  - revoked
+                  - unknown
+    schedule:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - mode
+          properties:
+            mode:
+              const: manual
+        - type: object
+          additionalProperties: false
+          required:
+            - mode
+            - interval_seconds
+          properties:
+            mode:
+              const: interval
+            interval_seconds:
+              type: integer
+              minimum: 60
+              maximum: 2592000
+    source-2:
+      type: object
+      additionalProperties: false
+      required:
+        - id
+        - tenant_id
+        - name
+        - kind
+        - base_endpoint
+        - fetch_policy_profile
+        - schedule
+        - state
+        - created_at
+      properties:
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        kind:
+          type: string
+          enum:
+            - oci
+            - mcp-registry
+            - a2a
+        base_endpoint:
+          type: string
+          format: uri
+          pattern: ^https://
+          maxLength: 2048
+        fetch_policy_profile:
+          $ref: '#/components/schemas/dnsToken'
+        credential_reference:
+          $ref: '#/components/schemas/dnsToken'
+        schedule:
+          $ref: '#/components/schemas/schedule'
+        state:
+          type: string
+          enum:
+            - disabled
+            - enabled
+            - retired
+        created_at:
+          type: string
+          format: date-time
+    importSourcePage:
+      $ref: '#/components/schemas/basePage'
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/source-2'
+    sourceCreate:
+      type: object
+      additionalProperties: false
+      required:
+        - name
+        - kind
+        - base_endpoint
+        - fetch_policy_profile
+        - schedule
+      properties:
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        kind:
+          type: string
+          enum:
+            - oci
+            - mcp-registry
+            - a2a
+        base_endpoint:
+          type: string
+          format: uri
+          pattern: ^https://
+          maxLength: 2048
+        fetch_policy_profile:
+          $ref: '#/components/schemas/dnsToken'
+        credential_reference:
+          $ref: '#/components/schemas/dnsToken'
+        schedule:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - mode
+              properties:
+                mode:
+                  const: manual
+            - type: object
+              additionalProperties: false
+              required:
+                - mode
+                - interval_seconds
+              properties:
+                mode:
+                  const: interval
+                interval_seconds:
+                  type: integer
+                  minimum: 60
+                  maximum: 2592000
+    stateChange:
+      type: object
+      additionalProperties: false
+      required:
+        - state
+        - reason_code
+      properties:
+        state:
+          type: string
+          enum:
+            - disabled
+            - enabled
+            - retired
+        reason_code:
+          type: string
+          minLength: 1
+          maxLength: 128
+        explanation:
+          type: string
+          maxLength: 4096
+    run:
+      type: object
+      additionalProperties: false
+      required:
+        - mode
+      properties:
+        mode:
+          type: string
+          enum:
+            - full
+            - incremental
+    conflictResolution:
+      oneOf:
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - local_version
+            - reason
+          properties:
+            action:
+              const: map-new-version
+            local_version:
+              $ref: '#/components/schemas/semver'
+            reason:
+              type: string
+              minLength: 1
+              maxLength: 4096
+        - type: object
+          additionalProperties: false
+          required:
+            - action
+            - reason
+          properties:
+            action:
+              const: reject
+            reason:
+              type: string
+              minLength: 1
+              maxLength: 4096
+    capability:
+      type: string
+      minLength: 3
+      maxLength: 255
+      pattern: ^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?)+$
+    capabilitySet:
+      type: array
+      maxItems: 256
+      uniqueItems: true
+      items:
+        $ref: '#/components/schemas/capability'
+    artifact-requirement-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/artifact-requirement/v1
+      title: ThinkPixelMP ArtifactRequirement v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+      properties:
+        schema_version:
+          const: 1
+        capabilities:
+          type: object
+          additionalProperties: false
+          properties:
+            required:
+              $ref: '#/components/schemas/capabilitySet'
+            optional:
+              $ref: '#/components/schemas/capabilitySet'
+        runtime:
+          type: object
+          additionalProperties: false
+          properties:
+            profile:
+              $ref: '#/components/schemas/dnsToken'
+            minimum_isolation_class:
+              type: string
+              enum:
+                - container-standard
+                - microvm-strong
+                - confidential-strong
+            os:
+              type: string
+              enum:
+                - linux
+            architectures:
+              type: array
+              minItems: 1
+              maxItems: 4
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - amd64
+                  - arm64
+            minimum_cpu_millicores:
+              type: integer
+              minimum: 1
+            minimum_memory_bytes:
+              type: integer
+              minimum: 1
+            minimum_ephemeral_storage_bytes:
+              type: integer
+              minimum: 1
+            minimum_workspace_storage_bytes:
+              type: integer
+              minimum: 1
+            durable_workspace_required:
+              type: boolean
+            gpu_required:
+              type: boolean
+            gpu_classes:
+              type: array
+              maxItems: 8
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/dnsToken'
+            adapter:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - compatibility
+              properties:
+                kind:
+                  $ref: '#/components/schemas/dnsToken'
+                compatibility:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+        network:
+          type: object
+          additionalProperties: false
+          required:
+            - profile
+          properties:
+            profile:
+              type: string
+              enum:
+                - none
+                - thinkpixel-only
+                - package-mirrors
+                - restricted-external
+                - unrestricted-standalone
+            endpoint_classes:
+              type: array
+              maxItems: 32
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/dnsToken'
+          allOf:
+            - if:
+                properties:
+                  profile:
+                    const: restricted-external
+              then:
+                required:
+                  - endpoint_classes
+                properties:
+                  endpoint_classes:
+                    minItems: 1
+              else:
+                properties:
+                  endpoint_classes:
+                    maxItems: 0
+        integrations:
+          type: array
+          maxItems: 64
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - kind
+              - identifier
+              - required
+            properties:
+              kind:
+                type: string
+                enum:
+                  - mcp-server
+                  - a2a-peer
+                  - model-feature
+                  - model-family
+                  - artifact-store
+              identifier:
+                type: string
+                minLength: 1
+                maxLength: 255
+              required:
+                type: boolean
+      $defs:
+        capability:
+          type: string
+          minLength: 3
+          maxLength: 255
+          pattern: ^[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9_-]*[a-z0-9])?)+$
+        capabilitySet:
+          type: array
+          maxItems: 256
+          uniqueItems: true
+          items:
+            $ref: '#/components/schemas/capability'
+    artifact-dependency-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/artifact-dependency/v1
+      title: ThinkPixelMP ArtifactDependency v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - name
+        - artifact
+        - required
+        - selector
+      properties:
+        schema_version:
+          const: 1
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        artifact:
+          $ref: '#/components/schemas/artifactIdentity'
+        required:
+          type: boolean
+        catalog:
+          $ref: '#/components/schemas/dnsToken'
+        source:
+          type: string
+          minLength: 1
+          maxLength: 255
+        selector:
+          oneOf:
+            - type: object
+              additionalProperties: false
+              required:
+                - digest
+              properties:
+                digest:
+                  $ref: '#/components/schemas/sha256Digest'
+            - type: object
+              additionalProperties: false
+              required:
+                - version
+              properties:
+                version:
+                  $ref: '#/components/schemas/semver'
+            - type: object
+              additionalProperties: false
+              required:
+                - range
+              properties:
+                range:
+                  type: string
+                  minLength: 1
+                  maxLength: 255
+    coordinates:
+      type: object
+      additionalProperties: false
+      required:
+        - namespace
+        - name
+        - version
+      properties:
+        namespace:
+          $ref: '#/components/schemas/namespace'
+        name:
+          $ref: '#/components/schemas/dnsToken'
+        version:
+          $ref: '#/components/schemas/semver'
+    dependencies:
+      type: array
+      maxItems: 256
+      items:
+        $ref: '#/components/schemas/artifact-dependency-v1.schema'
+    skill-descriptor-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/skill-descriptor/v1
+      title: ThinkPixelMP generated SkillDescriptor v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - kind
+        - artifact
+        - requirements
+        - dependencies
+        - spec
+      properties:
+        schema_version:
+          const: 1
+        kind:
+          const: skill
+        artifact:
+          $ref: '#/components/schemas/coordinates'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          $ref: '#/components/schemas/dependencies'
+        spec:
+          type: object
+          additionalProperties: false
+          required:
+            - source
+            - package
+            - classification
+          properties:
+            source:
+              type: object
+              additionalProperties: false
+              required:
+                - path
+                - digest
+                - metadata
+              properties:
+                path:
+                  const: SKILL.md
+                digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                metadata:
+                  type: object
+                  additionalProperties: false
+                  required:
+                    - name
+                    - description
+                  properties:
+                    name:
+                      type: string
+                      minLength: 1
+                      maxLength: 128
+                    description:
+                      type: string
+                      minLength: 1
+                      maxLength: 2048
+                    license:
+                      type: string
+                      minLength: 1
+                      maxLength: 128
+                    compatibility:
+                      type: string
+                      minLength: 1
+                      maxLength: 500
+            package:
+              type: object
+              additionalProperties: false
+              required:
+                - media_type
+                - digest
+                - size_bytes
+                - file_count
+              properties:
+                media_type:
+                  const: application/vnd.thinkpixel.skill.layer.v1+tar+gzip
+                digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                size_bytes:
+                  type: integer
+                  minimum: 1
+                file_count:
+                  type: integer
+                  minimum: 1
+            classification:
+              type: object
+              additionalProperties: false
+              required:
+                - artifact_class
+                - reasons
+              properties:
+                artifact_class:
+                  type: string
+                  enum:
+                    - instructional
+                    - executable-local
+                reasons:
+                  type: array
+                  maxItems: 32
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum:
+                      - executable-file
+                      - shebang
+                      - binary-outside-assets
+                      - skill-markdown-code
+              allOf:
+                - if:
+                    properties:
+                      artifact_class:
+                        const: instructional
+                  then:
+                    properties:
+                      reasons:
+                        maxItems: 0
+                - if:
+                    properties:
+                      artifact_class:
+                        const: executable-local
+                  then:
+                    properties:
+                      reasons:
+                        minItems: 1
+    agentRuntimeSpec:
+      type: object
+      additionalProperties: false
+      required:
+        - runtime_id
+        - image
+        - adapter
+        - entrypoint
+        - durable_vendor_paths
+        - workspace_mount
+        - runtime_profile
+        - platform
+      properties:
+        runtime_id:
+          $ref: '#/components/schemas/dnsToken'
+        image:
+          type: object
+          additionalProperties: false
+          required:
+            - reference
+            - digest
+          properties:
+            reference:
+              type: string
+              minLength: 73
+              maxLength: 2048
+              pattern: ^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            manifest_media_type:
+              type: string
+              enum:
+                - application/vnd.oci.image.manifest.v1+json
+                - application/vnd.docker.distribution.manifest.v2+json
+        adapter:
+          type: object
+          additionalProperties: false
+          required:
+            - kind
+            - protocol_version
+            - compatibility
+          properties:
+            kind:
+              $ref: '#/components/schemas/dnsToken'
+            protocol_version:
+              $ref: '#/components/schemas/semver'
+            compatibility:
+              type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[0-9A-Za-z<>=~^*., -]+$
+            vendor_state_format:
+              type: string
+              minLength: 1
+              maxLength: 128
+              pattern: ^[A-Za-z0-9][A-Za-z0-9._/-]*$
+        entrypoint:
+          type: object
+          additionalProperties: false
+          required:
+            - command
+          properties:
+            command:
+              type: array
+              minItems: 1
+              maxItems: 32
+              items:
+                type: string
+                minLength: 1
+                maxLength: 1024
+                pattern: ^[^\u0000\r\n]+$
+            working_directory:
+              type: string
+              minLength: 1
+              maxLength: 1024
+              pattern: ^/(?:[A-Za-z0-9._-]+/?)*$
+            shutdown_grace_seconds:
+              type: integer
+              minimum: 1
+              maximum: 300
+              default: 30
+        durable_vendor_paths:
+          type: array
+          maxItems: 32
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 7
+            maxLength: 1024
+            pattern: ^/state/[A-Za-z0-9][A-Za-z0-9._/-]*$
+        workspace_mount:
+          const: /workspace
+        runtime_profile:
+          type: object
+          additionalProperties: false
+          required:
+            - name
+            - minimum_isolation_class
+          properties:
+            name:
+              $ref: '#/components/schemas/dnsToken'
+            minimum_isolation_class:
+              type: string
+              enum:
+                - container-standard
+                - microvm-strong
+                - confidential-strong
+            required_network_profile:
+              type: string
+              enum:
+                - none
+                - thinkpixel-only
+                - restricted-development
+                - package-mirrors
+                - unrestricted-standalone
+            required_capabilities:
+              type: array
+              maxItems: 32
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 3
+                maxLength: 255
+        platform:
+          type: object
+          additionalProperties: false
+          required:
+            - os
+            - architectures
+          properties:
+            os:
+              const: linux
+            architectures:
+              type: array
+              minItems: 1
+              maxItems: 4
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - amd64
+                  - arm64
+            minimum_agentd_protocol:
+              $ref: '#/components/schemas/semver'
+            requires_gpu:
+              type: boolean
+              default: false
+            gpu_classes:
+              type: array
+              maxItems: 8
+              uniqueItems: true
+              items:
+                $ref: '#/components/schemas/dnsToken'
+          allOf:
+            - if:
+                properties:
+                  requires_gpu:
+                    const: true
+                required:
+                  - requires_gpu
+              then:
+                required:
+                  - gpu_classes
+                properties:
+                  gpu_classes:
+                    minItems: 1
+              else:
+                properties:
+                  gpu_classes:
+                    maxItems: 0
+        declared_environment:
+          type: array
+          maxItems: 64
+          uniqueItems: true
+          items:
+            type: string
+            minLength: 1
+            maxLength: 128
+            pattern: ^[A-Z_][A-Z0-9_]*$
+    agent-runtime-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/agent-runtime/v1
+      title: ThinkPixelMP agent-runtime descriptor v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - kind
+        - artifact
+        - requirements
+        - dependencies
+        - spec
+      properties:
+        schema_version:
+          const: 1
+        kind:
+          const: agent-runtime
+        artifact:
+          $ref: '#/components/schemas/coordinates'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          $ref: '#/components/schemas/dependencies'
+        spec:
+          $ref: '#/components/schemas/agentRuntimeSpec'
+      $defs:
+        agentRuntimeSpec:
+          type: object
+          additionalProperties: false
+          required:
+            - runtime_id
+            - image
+            - adapter
+            - entrypoint
+            - durable_vendor_paths
+            - workspace_mount
+            - runtime_profile
+            - platform
+          properties:
+            runtime_id:
+              $ref: '#/components/schemas/dnsToken'
+            image:
+              type: object
+              additionalProperties: false
+              required:
+                - reference
+                - digest
+              properties:
+                reference:
+                  type: string
+                  minLength: 73
+                  maxLength: 2048
+                  pattern: ^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$
+                digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                manifest_media_type:
+                  type: string
+                  enum:
+                    - application/vnd.oci.image.manifest.v1+json
+                    - application/vnd.docker.distribution.manifest.v2+json
+            adapter:
+              type: object
+              additionalProperties: false
+              required:
+                - kind
+                - protocol_version
+                - compatibility
+              properties:
+                kind:
+                  $ref: '#/components/schemas/dnsToken'
+                protocol_version:
+                  $ref: '#/components/schemas/semver'
+                compatibility:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: ^[0-9A-Za-z<>=~^*., -]+$
+                vendor_state_format:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                  pattern: ^[A-Za-z0-9][A-Za-z0-9._/-]*$
+            entrypoint:
+              type: object
+              additionalProperties: false
+              required:
+                - command
+              properties:
+                command:
+                  type: array
+                  minItems: 1
+                  maxItems: 32
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 1024
+                    pattern: ^[^\u0000\r\n]+$
+                working_directory:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                  pattern: ^/(?:[A-Za-z0-9._-]+/?)*$
+                shutdown_grace_seconds:
+                  type: integer
+                  minimum: 1
+                  maximum: 300
+                  default: 30
+            durable_vendor_paths:
+              type: array
+              maxItems: 32
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 7
+                maxLength: 1024
+                pattern: ^/state/[A-Za-z0-9][A-Za-z0-9._/-]*$
+            workspace_mount:
+              const: /workspace
+            runtime_profile:
+              type: object
+              additionalProperties: false
+              required:
+                - name
+                - minimum_isolation_class
+              properties:
+                name:
+                  $ref: '#/components/schemas/dnsToken'
+                minimum_isolation_class:
+                  type: string
+                  enum:
+                    - container-standard
+                    - microvm-strong
+                    - confidential-strong
+                required_network_profile:
+                  type: string
+                  enum:
+                    - none
+                    - thinkpixel-only
+                    - restricted-development
+                    - package-mirrors
+                    - unrestricted-standalone
+                required_capabilities:
+                  type: array
+                  maxItems: 32
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 3
+                    maxLength: 255
+            platform:
+              type: object
+              additionalProperties: false
+              required:
+                - os
+                - architectures
+              properties:
+                os:
+                  const: linux
+                architectures:
+                  type: array
+                  minItems: 1
+                  maxItems: 4
+                  uniqueItems: true
+                  items:
+                    type: string
+                    enum:
+                      - amd64
+                      - arm64
+                minimum_agentd_protocol:
+                  $ref: '#/components/schemas/semver'
+                requires_gpu:
+                  type: boolean
+                  default: false
+                gpu_classes:
+                  type: array
+                  maxItems: 8
+                  uniqueItems: true
+                  items:
+                    $ref: '#/components/schemas/dnsToken'
+              allOf:
+                - if:
+                    properties:
+                      requires_gpu:
+                        const: true
+                    required:
+                      - requires_gpu
+                  then:
+                    required:
+                      - gpu_classes
+                    properties:
+                      gpu_classes:
+                        minItems: 1
+                  else:
+                    properties:
+                      gpu_classes:
+                        maxItems: 0
+            declared_environment:
+              type: array
+              maxItems: 64
+              uniqueItems: true
+              items:
+                type: string
+                minLength: 1
+                maxLength: 128
+                pattern: ^[A-Z_][A-Z0-9_]*$
+    mcp-server-descriptor-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/mcp-server-descriptor/v1
+      title: ThinkPixelMP MCPServerDescriptor v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - kind
+        - artifact
+        - requirements
+        - dependencies
+        - spec
+      properties:
+        schema_version:
+          const: 1
+        kind:
+          const: mcp-server
+        artifact:
+          $ref: '#/components/schemas/coordinates'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          $ref: '#/components/schemas/dependencies'
+        spec:
+          type: object
+          additionalProperties: false
+          required:
+            - protocol_compatibility
+            - delivery
+            - authentication
+          properties:
+            protocol_compatibility:
+              type: string
+              minLength: 1
+              maxLength: 128
+            delivery:
+              oneOf:
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - mode
+                    - transport
+                    - image
+                  properties:
+                    mode:
+                      const: oci
+                    transport:
+                      const: stdio
+                    image:
+                      type: object
+                      additionalProperties: false
+                      required:
+                        - reference
+                        - digest
+                      properties:
+                        reference:
+                          type: string
+                          minLength: 73
+                          maxLength: 2048
+                          pattern: ^[A-Za-z0-9._:/-]+@sha256:[a-f0-9]{64}$
+                        digest:
+                          $ref: '#/components/schemas/sha256Digest'
+                - type: object
+                  additionalProperties: false
+                  required:
+                    - mode
+                    - transport
+                    - endpoint
+                  properties:
+                    mode:
+                      const: remote
+                    transport:
+                      const: streamable-http
+                    endpoint:
+                      type: string
+                      format: uri
+                      maxLength: 2048
+                      pattern: ^https://
+            authentication:
+              type: array
+              maxItems: 16
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - type
+                  - name
+                  - required
+                properties:
+                  type:
+                    type: string
+                    enum:
+                      - none
+                      - oauth2
+                      - oidc
+                      - api-key
+                      - mtls
+                  name:
+                    $ref: '#/components/schemas/dnsToken'
+                  required:
+                    type: boolean
+            tools:
+              type: array
+              maxItems: 1024
+              items:
+                type: object
+                additionalProperties: false
+                required:
+                  - name
+                properties:
+                  name:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                  description:
+                    type: string
+                    maxLength: 4096
+                  input_schema_digest:
+                    $ref: '#/components/schemas/sha256Digest'
+    remote-agent-descriptor-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/remote-agent-descriptor/v1
+      title: ThinkPixelMP RemoteAgentDescriptor v1
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - kind
+        - artifact
+        - requirements
+        - dependencies
+        - spec
+      properties:
+        schema_version:
+          const: 1
+        kind:
+          const: remote-agent
+        artifact:
+          $ref: '#/components/schemas/coordinates'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          $ref: '#/components/schemas/dependencies'
+        spec:
+          type: object
+          additionalProperties: false
+          required:
+            - agent_card
+            - normalized
+          properties:
+            agent_card:
+              type: object
+              additionalProperties: false
+              required:
+                - media_type
+                - digest
+                - size_bytes
+                - layer_digest
+              properties:
+                media_type:
+                  const: application/json
+                digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                size_bytes:
+                  type: integer
+                  minimum: 2
+                layer_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                signature_reference:
+                  type: string
+                  minLength: 1
+                  maxLength: 2048
+            normalized:
+              type: object
+              additionalProperties: false
+              required:
+                - endpoint
+                - protocol_version
+                - skills
+              properties:
+                endpoint:
+                  type: string
+                  format: uri
+                  maxLength: 2048
+                  pattern: ^https://
+                protocol_version:
+                  $ref: '#/components/schemas/semver'
+                skills:
+                  type: array
+                  maxItems: 1024
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+                capabilities:
+                  type: array
+                  maxItems: 256
+                  uniqueItems: true
+                  items:
+                    type: string
+                    minLength: 1
+                    maxLength: 255
+    bundle-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/bundle/v1
+      title: ThinkPixelMP Bundle descriptor v1
+      description: Author-facing composite descriptor. Effective requirements are resolved as the union of this descriptor and selected transitive components; incompatibility fails resolution.
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - kind
+        - artifact
+        - requirements
+        - dependencies
+        - spec
+      properties:
+        schema_version:
+          const: 1
+        kind:
+          const: bundle
+        artifact:
+          $ref: '#/components/schemas/coordinates'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          $ref: '#/components/schemas/dependencies'
+        spec:
+          type: object
+          additionalProperties: false
+          required:
+            - allowed_kinds
+            - requirement_aggregation
+          properties:
+            allowed_kinds:
+              type: array
+              minItems: 1
+              maxItems: 5
+              uniqueItems: true
+              items:
+                type: string
+                enum:
+                  - skill
+                  - agent-runtime
+                  - mcp-server
+                  - remote-agent
+                  - bundle
+            requirement_aggregation:
+              const: transitive-union-fail-on-conflict-v1
+    artifact-descriptor-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/artifact-descriptor/v1
+      title: ThinkPixelMP ArtifactDescriptor v1
+      description: Closed union of the five ThinkPixelMP artifact descriptor kinds.
+      oneOf:
+        - $ref: '#/components/schemas/skill-descriptor-v1.schema'
+        - $ref: '#/components/schemas/agent-runtime-v1.schema'
+        - $ref: '#/components/schemas/mcp-server-descriptor-v1.schema'
+        - $ref: '#/components/schemas/remote-agent-descriptor-v1.schema'
+        - $ref: '#/components/schemas/bundle-v1.schema'
+      $defs:
+        coordinates:
+          type: object
+          additionalProperties: false
+          required:
+            - namespace
+            - name
+            - version
+          properties:
+            namespace:
+              $ref: '#/components/schemas/namespace'
+            name:
+              $ref: '#/components/schemas/dnsToken'
+            version:
+              $ref: '#/components/schemas/semver'
+        requirements:
+          $ref: '#/components/schemas/artifact-requirement-v1.schema'
+        dependencies:
+          type: array
+          maxItems: 256
+          items:
+            $ref: '#/components/schemas/artifact-dependency-v1.schema'
+    node-2:
+      type: object
+      additionalProperties: false
+      required:
+        - digest
+        - artifact
+        - version
+        - kind
+        - descriptor_digest
+        - effective_requirement_digest
+      properties:
+        digest:
+          $ref: '#/components/schemas/sha256Digest'
+        artifact:
+          $ref: '#/components/schemas/artifactIdentity'
+        version:
+          $ref: '#/components/schemas/semver'
+        kind:
+          type: string
+          enum:
+            - skill
+            - agent-runtime
+            - mcp-server
+            - remote-agent
+            - bundle
+        descriptor_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        effective_requirement_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    edge:
+      type: object
+      additionalProperties: false
+      required:
+        - parent_digest
+        - dependency_index
+        - dependency_name
+        - child_digest
+      properties:
+        parent_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        dependency_index:
+          type: integer
+          minimum: 0
+          maximum: 255
+        dependency_name:
+          $ref: '#/components/schemas/dnsToken'
+        child_digest:
+          $ref: '#/components/schemas/sha256Digest'
+    artifact-lock-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/artifact-lock/v1
+      title: ThinkPixelMP ArtifactLock v1
+      description: Immutable dependency graph. lock_digest is SHA-256 over RFC 8785 canonical JSON with lock_digest omitted. Nodes and edges are sorted by their documented canonical keys before digesting.
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - resolution_algorithm
+        - root_digest
+        - nodes
+        - edges
+        - context
+        - created_at
+        - lock_digest
+      properties:
+        schema_version:
+          const: 1
+        resolution_algorithm:
+          const: thinkpixelmp-resolution-v1
+        root_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        nodes:
+          type: array
+          minItems: 1
+          maxItems: 10000
+          items:
+            $ref: '#/components/schemas/node-2'
+        edges:
+          type: array
+          maxItems: 50000
+          items:
+            $ref: '#/components/schemas/edge'
+        context:
+          type: object
+          additionalProperties: false
+          required:
+            - catalog_id
+            - catalog_snapshot_digest
+            - policy_digest
+            - evidence_snapshot_digest
+          properties:
+            catalog_id:
+              $ref: '#/components/schemas/uuidV7'
+            catalog_snapshot_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            policy_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            evidence_snapshot_digest:
+              $ref: '#/components/schemas/sha256Digest'
+        created_at:
+          type: string
+          format: date-time
+        lock_digest:
+          $ref: '#/components/schemas/sha256Digest'
+      $defs:
+        node:
+          type: object
+          additionalProperties: false
+          required:
+            - digest
+            - artifact
+            - version
+            - kind
+            - descriptor_digest
+            - effective_requirement_digest
+          properties:
+            digest:
+              $ref: '#/components/schemas/sha256Digest'
+            artifact:
+              $ref: '#/components/schemas/artifactIdentity'
+            version:
+              $ref: '#/components/schemas/semver'
+            kind:
+              type: string
+              enum:
+                - skill
+                - agent-runtime
+                - mcp-server
+                - remote-agent
+                - bundle
+            descriptor_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            effective_requirement_digest:
+              $ref: '#/components/schemas/sha256Digest'
+        edge:
+          type: object
+          additionalProperties: false
+          required:
+            - parent_digest
+            - dependency_index
+            - dependency_name
+            - child_digest
+          properties:
+            parent_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            dependency_index:
+              type: integer
+              minimum: 0
+              maximum: 255
+            dependency_name:
+              $ref: '#/components/schemas/dnsToken'
+            child_digest:
+              $ref: '#/components/schemas/sha256Digest'
+    catalog-snapshot-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/catalog-snapshot/v1
+      title: ThinkPixelMP CatalogSnapshot v1
+      description: Complete, self-contained immutable catalog view. The parent is ancestry metadata only. snapshot_digest is SHA-256 over RFC 8785 canonical JSON with snapshot_digest and signing_identity omitted.
+      type: object
+      additionalProperties: false
+      required:
+        - schema_version
+        - snapshot_id
+        - tenant_id
+        - catalog_id
+        - created_at
+        - entries
+        - policy
+        - lifecycle
+        - snapshot_digest
+        - signing_identity
+      properties:
+        schema_version:
+          const: 1
+        snapshot_id:
+          $ref: '#/components/schemas/uuidV7'
+        tenant_id:
+          $ref: '#/components/schemas/uuidV7'
+        catalog_id:
+          $ref: '#/components/schemas/uuidV7'
+        created_at:
+          type: string
+          format: date-time
+        parent_snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        entries:
+          type: array
+          maxItems: 100000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - catalog_entry_id
+              - artifact_version_id
+              - artifact_digest
+              - entry_state
+              - promotion_decision_id
+            properties:
+              catalog_entry_id:
+                $ref: '#/components/schemas/uuidV7'
+              artifact_version_id:
+                $ref: '#/components/schemas/uuidV7'
+              artifact_digest:
+                $ref: '#/components/schemas/sha256Digest'
+              entry_state:
+                type: string
+                enum:
+                  - active
+                  - removed
+              promotion_decision_id:
+                $ref: '#/components/schemas/uuidV7'
+              promotion_attestation_digest:
+                $ref: '#/components/schemas/sha256Digest'
+              resolution_digest:
+                $ref: '#/components/schemas/sha256Digest'
+              lock_digest:
+                $ref: '#/components/schemas/sha256Digest'
+              evidence_record_digests:
+                type: array
+                maxItems: 4096
+                uniqueItems: true
+                items:
+                  $ref: '#/components/schemas/sha256Digest'
+              evidence_report_digests:
+                type: array
+                maxItems: 4096
+                uniqueItems: true
+                items:
+                  $ref: '#/components/schemas/sha256Digest'
+        policy:
+          type: object
+          additionalProperties: false
+          required:
+            - bundle_digest
+            - activation_digest
+          properties:
+            bundle_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            activation_digest:
+              $ref: '#/components/schemas/sha256Digest'
+        lifecycle:
+          type: array
+          maxItems: 100000
+          items:
+            type: object
+            additionalProperties: false
+            required:
+              - artifact_digest
+              - state
+              - record_digest
+            properties:
+              artifact_digest:
+                $ref: '#/components/schemas/sha256Digest'
+              state:
+                type: string
+                enum:
+                  - active
+                  - deprecated
+                  - quarantined
+                  - revoked
+              record_digest:
+                $ref: '#/components/schemas/sha256Digest'
+        snapshot_digest:
+          $ref: '#/components/schemas/sha256Digest'
+        signing_identity:
+          type: string
+          minLength: 1
+          maxLength: 512
+    artifactRegistered:
+      properties:
+        type:
+          const: io.thinkpixel.mp.artifact.registered.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - artifact_version_id
+            - artifact_digest
+            - descriptor_digest
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            artifact_version_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            descriptor_digest:
+              $ref: '#/components/schemas/sha256Digest'
+    artifactLifecycle:
+      properties:
+        type:
+          enum:
+            - io.thinkpixel.mp.artifact.deprecated.v1
+            - io.thinkpixel.mp.artifact.quarantined.v1
+            - io.thinkpixel.mp.artifact.quarantine-released.v1
+            - io.thinkpixel.mp.artifact.revoked.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - artifact_version_id
+            - artifact_digest
+            - previous_state
+            - current_state
+            - reason_code
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            artifact_version_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            previous_state:
+              type: string
+              enum:
+                - active
+                - deprecated
+                - quarantined
+            current_state:
+              type: string
+              enum:
+                - active
+                - deprecated
+                - quarantined
+                - revoked
+            reason_code:
+              type: string
+              minLength: 1
+              maxLength: 128
+      oneOf:
+        - properties:
+            type:
+              const: io.thinkpixel.mp.artifact.deprecated.v1
+            data:
+              properties:
+                current_state:
+                  const: deprecated
+        - properties:
+            type:
+              const: io.thinkpixel.mp.artifact.quarantined.v1
+            data:
+              properties:
+                current_state:
+                  const: quarantined
+        - properties:
+            type:
+              const: io.thinkpixel.mp.artifact.quarantine-released.v1
+            data:
+              properties:
+                current_state:
+                  const: active
+        - properties:
+            type:
+              const: io.thinkpixel.mp.artifact.revoked.v1
+            data:
+              properties:
+                current_state:
+                  const: revoked
+    evidenceAccepted:
+      properties:
+        type:
+          const: io.thinkpixel.mp.evidence.accepted.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - evidence_record_id
+            - artifact_digest
+            - category
+            - conclusion
+            - report_digest
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            evidence_record_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            category:
+              type: string
+              minLength: 1
+              maxLength: 128
+            conclusion:
+              type: string
+              enum:
+                - pass
+                - fail
+                - warning
+                - unknown
+                - not-applicable
+            report_digest:
+              $ref: '#/components/schemas/sha256Digest'
+    policyActivated:
+      properties:
+        type:
+          const: io.thinkpixel.mp.policy.activated.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - catalog_id
+            - policy_digest
+            - activation_digest
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            catalog_id:
+              $ref: '#/components/schemas/uuidV7'
+            policy_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            activation_digest:
+              $ref: '#/components/schemas/sha256Digest'
+    promotionDecided:
+      properties:
+        type:
+          const: io.thinkpixel.mp.promotion.decided.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - promotion_request_id
+            - promotion_decision_id
+            - artifact_digest
+            - catalog_id
+            - decision
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            promotion_request_id:
+              $ref: '#/components/schemas/uuidV7'
+            promotion_decision_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            catalog_id:
+              $ref: '#/components/schemas/uuidV7'
+            decision:
+              type: string
+              enum:
+                - approved
+                - denied
+                - expired
+                - cancelled
+    catalogEntryChanged:
+      properties:
+        type:
+          const: io.thinkpixel.mp.catalog-entry.changed.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - catalog_id
+            - catalog_entry_id
+            - artifact_digest
+            - previous_state
+            - current_state
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            catalog_id:
+              $ref: '#/components/schemas/uuidV7'
+            catalog_entry_id:
+              $ref: '#/components/schemas/uuidV7'
+            artifact_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            previous_state:
+              type: string
+              enum:
+                - absent
+                - active
+                - removed
+            current_state:
+              type: string
+              enum:
+                - active
+                - removed
+    resolutionCreated:
+      properties:
+        type:
+          const: io.thinkpixel.mp.resolution.created.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - resolution_id
+            - resolution_digest
+            - root_digest
+            - lock_digest
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            resolution_id:
+              $ref: '#/components/schemas/uuidV7'
+            resolution_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            root_digest:
+              $ref: '#/components/schemas/sha256Digest'
+            lock_digest:
+              $ref: '#/components/schemas/sha256Digest'
+    importFinished:
+      properties:
+        type:
+          enum:
+            - io.thinkpixel.mp.import.completed.v1
+            - io.thinkpixel.mp.import.failed.v1
+            - io.thinkpixel.mp.import.conflicted.v1
+        data:
+          type: object
+          additionalProperties: false
+          required:
+            - tenant_id
+            - transaction_cursor
+            - import_source_id
+            - import_run_id
+            - outcome
+          properties:
+            tenant_id:
+              $ref: '#/components/schemas/uuidV7'
+            transaction_cursor:
+              type: string
+              minLength: 1
+              maxLength: 1024
+            import_source_id:
+              $ref: '#/components/schemas/uuidV7'
+            import_run_id:
+              $ref: '#/components/schemas/uuidV7'
+            outcome:
+              type: string
+              enum:
+                - completed
+                - failed
+                - conflicted
+            reason_code:
+              type: string
+              minLength: 1
+              maxLength: 128
+      oneOf:
+        - properties:
+            type:
+              const: io.thinkpixel.mp.import.completed.v1
+            data:
+              properties:
+                outcome:
+                  const: completed
+        - properties:
+            type:
+              const: io.thinkpixel.mp.import.failed.v1
+            data:
+              properties:
+                outcome:
+                  const: failed
+        - properties:
+            type:
+              const: io.thinkpixel.mp.import.conflicted.v1
+            data:
+              properties:
+                outcome:
+                  const: conflicted
+    marketplace-event-v1.schema:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      $id: https://schemas.thinkpixel.io/thinkpixelmp/marketplace-event/v1
+      title: ThinkPixelMP CloudEvent v1
+      type: object
+      additionalProperties: false
+      required:
+        - specversion
+        - id
+        - source
+        - type
+        - subject
+        - time
+        - datacontenttype
+        - sequence
+        - data
+      properties:
+        specversion:
+          const: '1.0'
+        id:
+          $ref: '#/components/schemas/uuidV7'
+        source:
+          type: string
+          format: uri-reference
+          maxLength: 1024
+        type:
+          type: string
+        subject:
+          type: string
+          minLength: 1
+          maxLength: 512
+        time:
+          type: string
+          format: date-time
+        datacontenttype:
+          const: application/vnd.thinkpixel.marketplace-event.v1+json
+        sequence:
+          type: integer
+          minimum: 1
+        data:
+          type: object
+      oneOf:
+        - $ref: '#/components/schemas/artifactRegistered'
+        - $ref: '#/components/schemas/artifactLifecycle'
+        - $ref: '#/components/schemas/evidenceAccepted'
+        - $ref: '#/components/schemas/policyActivated'
+        - $ref: '#/components/schemas/promotionDecided'
+        - $ref: '#/components/schemas/catalogEntryChanged'
+        - $ref: '#/components/schemas/resolutionCreated'
+        - $ref: '#/components/schemas/importFinished'
+      $defs:
+        artifactRegistered:
+          properties:
+            type:
+              const: io.thinkpixel.mp.artifact.registered.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - artifact_version_id
+                - artifact_digest
+                - descriptor_digest
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                artifact_version_id:
+                  $ref: '#/components/schemas/uuidV7'
+                artifact_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                descriptor_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+        artifactLifecycle:
+          properties:
+            type:
+              enum:
+                - io.thinkpixel.mp.artifact.deprecated.v1
+                - io.thinkpixel.mp.artifact.quarantined.v1
+                - io.thinkpixel.mp.artifact.quarantine-released.v1
+                - io.thinkpixel.mp.artifact.revoked.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - artifact_version_id
+                - artifact_digest
+                - previous_state
+                - current_state
+                - reason_code
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                artifact_version_id:
+                  $ref: '#/components/schemas/uuidV7'
+                artifact_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                previous_state:
+                  type: string
+                  enum:
+                    - active
+                    - deprecated
+                    - quarantined
+                current_state:
+                  type: string
+                  enum:
+                    - active
+                    - deprecated
+                    - quarantined
+                    - revoked
+                reason_code:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+          oneOf:
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.artifact.deprecated.v1
+                data:
+                  properties:
+                    current_state:
+                      const: deprecated
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.artifact.quarantined.v1
+                data:
+                  properties:
+                    current_state:
+                      const: quarantined
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.artifact.quarantine-released.v1
+                data:
+                  properties:
+                    current_state:
+                      const: active
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.artifact.revoked.v1
+                data:
+                  properties:
+                    current_state:
+                      const: revoked
+        evidenceAccepted:
+          properties:
+            type:
+              const: io.thinkpixel.mp.evidence.accepted.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - evidence_record_id
+                - artifact_digest
+                - category
+                - conclusion
+                - report_digest
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                evidence_record_id:
+                  $ref: '#/components/schemas/uuidV7'
+                artifact_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                category:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+                conclusion:
+                  type: string
+                  enum:
+                    - pass
+                    - fail
+                    - warning
+                    - unknown
+                    - not-applicable
+                report_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+        policyActivated:
+          properties:
+            type:
+              const: io.thinkpixel.mp.policy.activated.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - catalog_id
+                - policy_digest
+                - activation_digest
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                catalog_id:
+                  $ref: '#/components/schemas/uuidV7'
+                policy_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                activation_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+        promotionDecided:
+          properties:
+            type:
+              const: io.thinkpixel.mp.promotion.decided.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - promotion_request_id
+                - promotion_decision_id
+                - artifact_digest
+                - catalog_id
+                - decision
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                promotion_request_id:
+                  $ref: '#/components/schemas/uuidV7'
+                promotion_decision_id:
+                  $ref: '#/components/schemas/uuidV7'
+                artifact_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                catalog_id:
+                  $ref: '#/components/schemas/uuidV7'
+                decision:
+                  type: string
+                  enum:
+                    - approved
+                    - denied
+                    - expired
+                    - cancelled
+        catalogEntryChanged:
+          properties:
+            type:
+              const: io.thinkpixel.mp.catalog-entry.changed.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - catalog_id
+                - catalog_entry_id
+                - artifact_digest
+                - previous_state
+                - current_state
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                catalog_id:
+                  $ref: '#/components/schemas/uuidV7'
+                catalog_entry_id:
+                  $ref: '#/components/schemas/uuidV7'
+                artifact_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                previous_state:
+                  type: string
+                  enum:
+                    - absent
+                    - active
+                    - removed
+                current_state:
+                  type: string
+                  enum:
+                    - active
+                    - removed
+        resolutionCreated:
+          properties:
+            type:
+              const: io.thinkpixel.mp.resolution.created.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - resolution_id
+                - resolution_digest
+                - root_digest
+                - lock_digest
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                resolution_id:
+                  $ref: '#/components/schemas/uuidV7'
+                resolution_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                root_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+                lock_digest:
+                  $ref: '#/components/schemas/sha256Digest'
+        importFinished:
+          properties:
+            type:
+              enum:
+                - io.thinkpixel.mp.import.completed.v1
+                - io.thinkpixel.mp.import.failed.v1
+                - io.thinkpixel.mp.import.conflicted.v1
+            data:
+              type: object
+              additionalProperties: false
+              required:
+                - tenant_id
+                - transaction_cursor
+                - import_source_id
+                - import_run_id
+                - outcome
+              properties:
+                tenant_id:
+                  $ref: '#/components/schemas/uuidV7'
+                transaction_cursor:
+                  type: string
+                  minLength: 1
+                  maxLength: 1024
+                import_source_id:
+                  $ref: '#/components/schemas/uuidV7'
+                import_run_id:
+                  $ref: '#/components/schemas/uuidV7'
+                outcome:
+                  type: string
+                  enum:
+                    - completed
+                    - failed
+                    - conflicted
+                reason_code:
+                  type: string
+                  minLength: 1
+                  maxLength: 128
+          oneOf:
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.import.completed.v1
+                data:
+                  properties:
+                    outcome:
+                      const: completed
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.import.failed.v1
+                data:
+                  properties:
+                    outcome:
+                      const: failed
+            - properties:
+                type:
+                  const: io.thinkpixel.mp.import.conflicted.v1
+                data:
+                  properties:
+                    outcome:
+                      const: conflicted

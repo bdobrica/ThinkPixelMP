@@ -27,7 +27,10 @@ npm ci
 make verify
 ```
 
-Focused commands are available as `make test`, `make vet`, and `make contracts`.
+Run `make help` for the stable developer/CI command surface. It includes generation,
+formatting, static analysis, focused test-suite, contract, dependency, aggregate
+verification, and image entry points. Targets whose implementation belongs to a
+later checklist item fail with an actionable message until that item is complete.
 
 ## Key concepts
 

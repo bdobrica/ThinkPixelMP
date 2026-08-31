@@ -33,6 +33,9 @@ formatting, static analysis, focused test-suite, contract, dependency, aggregate
 verification, and image entry points. Targets whose implementation belongs to a
 later checklist item fail with an actionable message until that item is complete.
 
+GitHub Actions applies the same aggregate gate and hardened image smoke with a
+least-privilege workflow; see [continuous integration](docs/operations/continuous-integration.md).
+
 Set a disposable `TPMP_POSTGRES_PASSWORD`, then run `make postgres-up` to start the
 pinned local database and `make migrate` to use the explicit migration entry point. See
 [`docs/operations/development-database.md`](docs/operations/development-database.md).

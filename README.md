@@ -37,6 +37,9 @@ Set a disposable `TPMP_POSTGRES_PASSWORD`, then run `make postgres-up` to start 
 pinned local database and `make migrate` to use the explicit migration entry point. See
 [`docs/operations/development-database.md`](docs/operations/development-database.md).
 
+Run `make image` to build the minimal non-root service container. Runtime hardening and
+smoke-run guidance are in [`docs/operations/container-image.md`](docs/operations/container-image.md).
+
 Use `go run ./cmd/thinkpixelmpctl live` to query the local service through its
 HTTP API. See [`docs/operations/cli.md`](docs/operations/cli.md) for endpoint and
 credential configuration.

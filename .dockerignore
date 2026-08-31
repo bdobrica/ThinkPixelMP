@@ -1,0 +1,15 @@
+.git
+.agents
+.codex
+node_modules
+docs
+test
+deploy
+migrations
+api
+scripts
+*.md
+compose.yaml
+package*.json
+redocly.yaml
+dependency-policy.json

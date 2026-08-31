@@ -96,6 +96,5 @@ migrate: ## Run the explicit database migration command (MIGRATE_ARGS=status by 
 
 verify: fmt-check static test-unit test-race dependency-check vulnerability-check license-check openapi-check contracts build ## Run the aggregate repository gate.
 
-image: ## Build the service image once ENG-014 supplies its definition.
-	@test -f Containerfile || { printf '%s\n' 'image: unavailable until ENG-014 adds Containerfile'; exit 2; }
+image: ## Build the hardened non-root service image.
 	docker build --file Containerfile --tag thinkpixelmp:dev .

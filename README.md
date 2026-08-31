@@ -19,6 +19,7 @@ Requirements:
 - Go 1.26.0 or a compatible toolchain;
 - Node.js and npm for OpenAPI validation;
 - `jq` for JSON Schema syntax validation.
+- Docker with Compose for the disposable PostgreSQL development dependency.
 
 Install the pinned contract tooling and run the aggregate repository gate:
 
@@ -31,6 +32,10 @@ Run `make help` for the stable developer/CI command surface. It includes generat
 formatting, static analysis, focused test-suite, contract, dependency, aggregate
 verification, and image entry points. Targets whose implementation belongs to a
 later checklist item fail with an actionable message until that item is complete.
+
+Set a disposable `TPMP_POSTGRES_PASSWORD`, then run `make postgres-up` to start the
+pinned local database and `make migrate` to use the explicit migration entry point. See
+[`docs/operations/development-database.md`](docs/operations/development-database.md).
 
 ## Key concepts
 

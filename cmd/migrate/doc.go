@@ -1,2 +1,2 @@
-// Package main is the future ThinkPixelMP database migration entry point.
+// Package main is the explicit ThinkPixelMP database migration entry point.
 package main

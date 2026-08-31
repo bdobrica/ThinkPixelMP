@@ -8,12 +8,15 @@ GOVULNCHECK_VERSION ?= v1.7.0
 GO_LICENSES_VERSION ?= v2.0.1
 ALLOWED_LICENSES ?= Apache-2.0,BSD-2-Clause,BSD-3-Clause,ISC,MIT
 BUILD_DIR ?= /tmp/thinkpixelmp-build
+COMPOSE ?= docker compose
+MIGRATE_ARGS ?= status
 
 .DEFAULT_GOAL := help
 
 .PHONY: help generate fmt fmt-check vet static lint test test-unit test-race test-integration \
 	test-contract test-security test-e2e openapi-generate openapi-check \
-	contracts dependency-check vulnerability-check license-check build verify image
+	contracts dependency-check vulnerability-check license-check build verify image \
+	postgres-up postgres-down migrate
 
 help: ## Show the stable developer and CI command surface.
 	@awk 'BEGIN {FS = ":.*## "; printf "ThinkPixelMP developer targets:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -80,6 +83,15 @@ license-check: ## Reject dependency licenses outside the policy allowlist.
 build: ## Build the ThinkPixelMP service binary with reproducible paths.
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build -trimpath -o $(BUILD_DIR)/thinkpixelmp ./cmd/thinkpixelmp
+
+postgres-up: ## Start the pinned disposable development PostgreSQL dependency.
+	$(COMPOSE) up --detach --wait postgres
+
+postgres-down: ## Stop the disposable development PostgreSQL dependency.
+	$(COMPOSE) down
+
+migrate: ## Run the explicit database migration command (MIGRATE_ARGS=status by default).
+	$(GO) run ./cmd/migrate $(MIGRATE_ARGS)
 
 verify: fmt-check static test-unit test-race dependency-check vulnerability-check license-check openapi-check contracts build ## Run the aggregate repository gate.
 

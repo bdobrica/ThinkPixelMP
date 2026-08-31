@@ -166,6 +166,7 @@ func repositoryRoot(t *testing.T) string {
 func goCommand(t *testing.T, arguments ...string) *exec.Cmd {
 	t.Helper()
 
+	//lint:ignore SA1019 The isolated check must reuse the exact selected test toolchain.
 	command := exec.Command(filepath.Join(runtime.GOROOT(), "bin", "go"), arguments...)
 	command.Env = append(os.Environ(), "GOTOOLCHAIN=local", "GOFLAGS=-modcacherw", "GOMODCACHE="+t.TempDir())
 	return command

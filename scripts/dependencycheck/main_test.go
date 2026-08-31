@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -200,17 +199,4 @@ func repositoryRoot(t *testing.T) string {
 		t.Fatalf("resolve repository root: %v", err)
 	}
 	return root
-}
-
-func marshalModules(t *testing.T, modules ...listedModule) string {
-	t.Helper()
-
-	var output strings.Builder
-	encoder := json.NewEncoder(&output)
-	for _, module := range modules {
-		if err := encoder.Encode(module); err != nil {
-			t.Fatal(err)
-		}
-	}
-	return output.String()
 }

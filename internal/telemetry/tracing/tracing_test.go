@@ -43,6 +43,7 @@ func TestTracingRejectsUnsafeOrIncompleteConfiguration(t *testing.T) {
 			t.Fatalf("accepted unsafe config: %#v", configured)
 		}
 	}
+	//lint:ignore SA1012 This deliberately verifies the public nil-context guard.
 	if _, err := New(nil, config.Defaults().Telemetry); err == nil {
 		t.Fatal("nil context accepted")
 	}

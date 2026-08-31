@@ -56,13 +56,14 @@ The initial duration cannot exceed 90 days. Expired, future-created, malformed, 
 
 ENG-003 provides the standard-library-only policy checker. It validates policy integrity, the selected module graph, source prefixes, exact/pseudo versions, forbidden directives, vendoring, checksum posture, graph/retraction errors, and exception shape/expiry.
 
-ENG-011 will pin and add full license-classification and call-graph-aware vulnerability scanners to the aggregate verification gate. Until then, adding a dependency still requires manual license/advisory review recorded with the dependency change; absence of a scanner is not evidence of safety.
+The aggregate verification gate pins go-licenses for dependency license classification and the official govulncheck scanner for call-graph-aware vulnerability analysis. Scanner success complements rather than replaces the required source, maintenance, provenance, and advisory review for a dependency change. Network or vulnerability-database failure fails the gate; it is not treated as a clean result.
 
 Run the current gate from the repository root:
 
 ```bash
 GOCACHE=/tmp/thinkpixelmp-dependency-go-cache GOTOOLCHAIN=go1.26.7 go run ./scripts/dependencycheck
 GOCACHE=/tmp/thinkpixelmp-dependency-go-cache GOTOOLCHAIN=go1.26.7 go test ./scripts/dependencycheck
+GOCACHE=/tmp/thinkpixelmp-dependency-go-cache GOTOOLCHAIN=go1.26.7 make vulnerability-check license-check
 ```
 
 Network, checksum-database, module metadata, or graph-resolution failures are failures, not clean results.

@@ -75,6 +75,7 @@ type goRunner struct {
 }
 
 func (runner goRunner) Output(ctx context.Context, arguments ...string) ([]byte, error) {
+	//lint:ignore SA1019 The checker must reuse the exact selected toolchain with auto-switching disabled.
 	command := exec.CommandContext(ctx, filepath.Join(runtime.GOROOT(), "bin", "go"), arguments...)
 	command.Dir = runner.directory
 	command.Env = append(os.Environ(), "GOTOOLCHAIN=local")

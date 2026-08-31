@@ -19,6 +19,9 @@ Status: Phase 1 compatibility baseline, reviewed 2026-08-30 against primary offi
 | OpenAPI | `3.1` | Canonical REST API description |
 | RFC 8785 JCS | RFC 8785 | Hashable JSON canonicalization |
 | Go | language/module baseline `1.26.0`; toolchain `1.26.7` | `go.mod` pins the exact development/build toolchain while retaining Go 1.26 language semantics; ORAS Go v2 supports Go 1.26 |
+| Staticcheck | `2026.2.1` (`honnef.co/go/tools` `v0.8.1`) | Pinned static-analysis gate with Go 1.26 support |
+| govulncheck | `v1.7.0` | Official Go call-graph-aware vulnerability scanner |
+| go-licenses | `v2.0.1` | Classifies runtime and test dependency licenses against repository policy |
 | PostgreSQL | development/test `18.6`; production majors `17` and `18` | Production uses a currently maintained minor release; migration tests cover the supported majors |
 | ORAS Go | `2.6.2` | Stable v2 adapter candidate; includes 2026 security hardening fixes |
 | Open Policy Agent | `1.17.0` | Embedded reference adapter candidate |

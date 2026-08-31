@@ -69,6 +69,7 @@ func TestPlannedGoPackagesAreDiscoverable(t *testing.T) {
 		"internal/app/promotion", "internal/app/publication", "internal/app/resolution",
 		"internal/domain", "internal/domain/artifact", "internal/domain/catalog", "internal/domain/evidence",
 		"internal/domain/promotion", "internal/domain/publisher", "internal/domain/resolution", "internal/domain/revocation",
+		"internal/domain/shared",
 		"internal/ports", "internal/ports/clock", "internal/ports/evidence", "internal/ports/identity",
 		"internal/ports/importer", "internal/ports/key", "internal/ports/policy", "internal/ports/provenance",
 		"internal/ports/registry", "internal/ports/signature", "internal/security", "internal/telemetry",

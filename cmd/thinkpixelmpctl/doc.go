@@ -1,2 +1,2 @@
-// Package main is the future ThinkPixelMP API client CLI entry point.
+// Package main provides the ThinkPixelMP HTTP API command-line client.
 package main

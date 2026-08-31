@@ -83,6 +83,7 @@ license-check: ## Reject dependency licenses outside the policy allowlist.
 build: ## Build the ThinkPixelMP service binary with reproducible paths.
 	@mkdir -p $(BUILD_DIR)
 	$(GO) build -trimpath -o $(BUILD_DIR)/thinkpixelmp ./cmd/thinkpixelmp
+	$(GO) build -trimpath -o $(BUILD_DIR)/thinkpixelmpctl ./cmd/thinkpixelmpctl
 
 postgres-up: ## Start the pinned disposable development PostgreSQL dependency.
 	$(COMPOSE) up --detach --wait postgres

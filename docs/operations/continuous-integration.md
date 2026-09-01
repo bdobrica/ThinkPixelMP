@@ -4,6 +4,8 @@ The GitHub Actions workflow runs the root `make verify` gate and a separate hard
 
 The workflow grants only read access to repository contents. Checkout credentials are not persisted, every third-party action reference is pinned to a full commit SHA, tool versions come from `go.mod`, `package-lock.json`, and the root `Makefile`, and every job has a bounded timeout. Concurrent runs for the same ref cancel superseded work.
 
+The aggregate gate also runs the tracked-file [repository hygiene check](repository-hygiene.md), which rejects committed credentials, signing keys, tokens, private evidence, and secret-bearing test fixtures.
+
 Action upgrades require reviewing the upstream release and changing both the immutable SHA and its adjacent human-readable release comment. Reproduce the principal CI gate locally with:
 
 ```bash

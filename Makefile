@@ -15,7 +15,7 @@ MIGRATE_ARGS ?= status
 
 .PHONY: help generate fmt fmt-check vet static lint test test-unit test-race test-integration \
 	test-contract test-security test-e2e openapi-generate openapi-check \
-	contracts dependency-check vulnerability-check license-check build verify image \
+	contracts repository-hygiene dependency-check vulnerability-check license-check build verify image \
 	postgres-up postgres-down migrate
 
 help: ## Show the stable developer and CI command surface.
@@ -70,6 +70,9 @@ openapi-check: ## Validate OpenAPI and reject generated-bundle drift.
 contracts: ## Validate schemas, OpenAPI, and repository whitespace.
 	./scripts/validate-phase0.sh
 
+repository-hygiene: ## Reject committed credentials, keys, tokens, and private evidence.
+	$(GO) run ./scripts/repositoryhygiene
+
 dependency-check: ## Enforce the repository Go dependency policy.
 	$(GO) run ./scripts/dependencycheck
 
@@ -94,7 +97,7 @@ postgres-down: ## Stop the disposable development PostgreSQL dependency.
 migrate: ## Run the explicit database migration command (MIGRATE_ARGS=status by default).
 	$(GO) run ./cmd/migrate $(MIGRATE_ARGS)
 
-verify: fmt-check static test-unit test-race dependency-check vulnerability-check license-check openapi-check contracts build ## Run the aggregate repository gate.
+verify: fmt-check static test-unit test-race repository-hygiene dependency-check vulnerability-check license-check openapi-check contracts build ## Run the aggregate repository gate.
 
 image: ## Build the hardened non-root service image.
 	docker build --file Containerfile --tag thinkpixelmp:dev .

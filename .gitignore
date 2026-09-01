@@ -1,4 +1,16 @@
 node_modules/
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+*.p12
+*.pfx
+*.jks
+private-evidence/
+raw-evidence/
+test-secrets/
+secret-testdata/
 api/openapi/*.bundle.yaml
 api/openapi/*.bundle.json
 .redocly/

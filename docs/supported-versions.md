@@ -2,6 +2,11 @@
 
 Status: Phase 1 compatibility baseline, reviewed 2026-08-30 against primary official sources.
 
+The matrix includes both implemented pins and selected targets for later Phase 1
+adapters. A target is not an availability claim: an integration becomes supported
+only when its implementation dependency is pinned and its applicable conformance
+gate passes.
+
 | Standard/tool | Baseline | Notes |
 | --- | --- | --- |
 | Agent Skills | Official specification snapshot reviewed 2026-08-29 | The public specification does not expose an independent specification release number; MP pins validator behavior and records the review snapshot |
@@ -25,6 +30,21 @@ Status: Phase 1 compatibility baseline, reviewed 2026-08-30 against primary offi
 | PostgreSQL | development/test `18.6`; production majors `17` and `18` | Production uses a currently maintained minor release; migration tests cover the supported majors |
 | ORAS Go | `2.6.2` | Stable v2 adapter candidate; includes 2026 security hardening fixes |
 | Open Policy Agent | `1.17.0` | Embedded reference adapter candidate |
+
+## Support policy
+
+- Versions pinned by `go.mod`, the root `Makefile`, `package-lock.json`, container
+  definitions, or versioned contracts change only through repository review.
+- Runtime, database, protocol, descriptor, canonicalization, and cryptographic
+  profile upgrades require applicable compatibility tests and a matrix update in
+  the same change.
+- Unknown schema, descriptor, canonicalization, signature, policy, and protocol
+  versions fail closed wherever authoritative interpretation is required.
+- Patch upgrades follow dependency, license, and vulnerability review. Breaking
+  contract changes require a new versioned contract and, when an accepted
+  decision changes, a superseding ADR.
+- Provider-specific version selection does not move ORAS, Sigstore/Cosign, OPA,
+  registry, MCP, or A2A types across the defined port/adapter boundaries.
 
 ## Primary references
 

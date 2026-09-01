@@ -9,7 +9,8 @@ This directory contains the normative architecture, security, interoperability, 
 - `contracts/` defines domain and integration contracts.
 - `../api/schemas/` contains the normative JSON Schema 2020-12 contracts, including the closed artifact-descriptor union and immutable lock graph.
 - `security/` defines threats, invariants, data handling, and hostile-input controls.
-- `operations/` defines availability, capacity, and supported-version expectations.
+- `operations/` defines availability and capacity expectations.
+- [`supported-versions.md`](supported-versions.md) records the verified compatibility matrix and pending adapter pins.
 - `evidence/` records phase-exit reviews and reproducible acceptance evidence.
 
 Normative terms such as **MUST**, **MUST NOT**, **SHOULD**, and **MAY** are interpreted as described by RFC 2119 and RFC 8174 when written in uppercase.

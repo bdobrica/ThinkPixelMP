@@ -16,7 +16,7 @@ MIGRATE_ARGS ?= status
 .PHONY: help generate fmt fmt-check vet static lint test test-unit test-race test-integration \
 	test-contract test-security test-e2e openapi-generate openapi-check \
 	contracts repository-hygiene dependency-check vulnerability-check license-check build verify image \
-	postgres-up postgres-down migrate
+	postgres-up postgres-down migrate test-migrations
 
 help: ## Show the stable developer and CI command surface.
 	@awk 'BEGIN {FS = ":.*## "; printf "ThinkPixelMP developer targets:\n\n"} /^[a-zA-Z0-9_-]+:.*## / {printf "  %-20s %s\n", $$1, $$2}' $(MAKEFILE_LIST)
@@ -24,12 +24,12 @@ help: ## Show the stable developer and CI command surface.
 generate: openapi-generate ## Regenerate all committed derived artifacts.
 
 fmt: ## Format repository Go source files in place.
-	$(GO) fmt ./cmd/... ./internal/... ./scripts/... ./test/...
+	$(GO) fmt ./cmd/... ./internal/... ./migrations/... ./scripts/... ./test/...
 
 fmt-check: ## Reject Go source files that are not gofmt-formatted.
-	@test -z "$$($(GOFMT) -l cmd internal scripts test)" || { \
+	@test -z "$$($(GOFMT) -l cmd internal migrations scripts test)" || { \
 		printf '%s\n' 'format check failed; run make fmt'; \
-		$(GOFMT) -l cmd internal scripts test; \
+		$(GOFMT) -l cmd internal migrations scripts test; \
 		exit 1; \
 	}
 
@@ -96,6 +96,9 @@ postgres-down: ## Stop the disposable development PostgreSQL dependency.
 
 migrate: ## Run the explicit database migration command (MIGRATE_ARGS=status by default).
 	$(GO) run ./cmd/migrate $(MIGRATE_ARGS)
+
+test-migrations: ## Test migrations and tenant RLS in a disposable PostgreSQL 18.6 container (requires Docker).
+	$(GO) test -count=1 -race -tags=dbintegration ./internal/adapters/postgres/migration/... ./cmd/migrate/...
 
 verify: fmt-check static test-unit test-race repository-hygiene dependency-check vulnerability-check license-check openapi-check contracts build ## Run the aggregate repository gate.
 

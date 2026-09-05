@@ -37,7 +37,8 @@ GitHub Actions applies the same aggregate gate and hardened image smoke with a
 least-privilege workflow; see [continuous integration](docs/operations/continuous-integration.md).
 
 Set a disposable `TPMP_POSTGRES_PASSWORD`, then run `make postgres-up` to start the
-pinned local database and `make migrate` to use the explicit migration entry point. See
+pinned local database. Configure the separate migration secret reference, then use
+`make migrate` to inspect history and `make migrate MIGRATE_ARGS=up` to apply the schema. See
 [`docs/operations/development-database.md`](docs/operations/development-database.md).
 
 Run `make image` to build the minimal non-root service container. Runtime hardening and

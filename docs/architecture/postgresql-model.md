@@ -28,4 +28,43 @@ Database constraints supplement domain validation for digest/version immutabilit
 
 Every authoritative mutation writes its domain record, AuditEvent, and OutboxMessage in one transaction. Consumers are at-least-once and deduplicate stable event IDs. Outbox claiming uses bounded leases/retries and dead-letter metadata without losing the original event.
 
-The Phase 0 model is logical rather than executable SQL. Migrations, indexes, partitioning, retention, and concurrency tests begin in Phase 2.
+DB-001 implements the tenant reference root and explicit transactional migration
+runner. DB-002 implements the Publisher aggregate with tenant-local slug
+uniqueness, append-only state records, and repository-enforced transaction-local
+tenant scope. DB-003 implements immutable Namespace ownership roots with canonical
+tenant-local path uniqueness, verified tenant-consistent Publisher ownership, and
+the same repository/RLS scoping. Namespace delegation and longest-prefix
+publication authorization remain sequenced as PUB-003. DB-004 implements the
+logical Artifact root with tenant-consistent Namespace membership, canonical
+tenant-local identity uniqueness, a fixed V1 kind, bounded discovery metadata,
+and repository/RLS scoping. DB-005 implements the ArtifactVersion identity
+root with strict semantic-version and SHA-256 digest uniqueness, tenant-consistent
+Artifact and Publisher attribution, fixed-kind consistency, taxonomy-compatible
+class/delivery metadata, initial lifecycle, and repository/RLS scoping. DB-006
+makes registered ArtifactVersion rows database-immutable, including their exact
+digest and payload metadata, and prevents deletion. DB-007 implements immutable,
+tenant-scoped ArtifactSource values that preserve submitted OCI, remote, or import
+metadata while binding the resolved source reference and SHA-256 digest to the
+parent ArtifactVersion and its delivery model. DB-008 implements one immutable,
+tenant-scoped ArtifactDescriptor per ArtifactVersion. It preserves the exact
+bounded normalized bytes used for the separately computed descriptor digest,
+stores their equivalent JSONB representation, and binds the V1 media type, kind,
+and repeated artifact coordinates to the parent ArtifactVersion. Kind-specific
+descriptor validation and RFC 8785 canonicalization remain in Phase 3; the
+persistence boundary accepts only bytes already normalized by trusted code.
+DB-009 implements one immutable, tenant-scoped ArtifactRequirement per persisted
+descriptor. It preserves exact normalized requirement bytes and their digest,
+stores an equivalent JSONB projection, validates the closed V1 declaration
+vocabulary, and requires the projection to equal the descriptor's `requirements`
+member. Requirements remain declarations and cannot grant Run authority.
+DB-010 implements immutable, ordered, tenant-scoped ArtifactDependency rows. It
+preserves exact normalized declaration bytes and digests, stable names, logical
+targets, required/optional flags, optional source/catalog context, and the exact
+typed selector. Each row is bound to its declaration index in the parent
+descriptor; dependency names are unique within that parent. These records are
+resolution inputs only and cannot grant authority. General audit/outbox coupling
+and optimistic concurrency remain sequenced as DB-011 and DB-015. See
+[migration files](../../migrations/README.md) and [database
+operations](../operations/development-database.md). The remaining aggregates,
+indexes, partitioning, and retention are still a logical model sequenced in Phase
+2 and later.

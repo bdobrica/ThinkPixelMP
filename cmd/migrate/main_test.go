@@ -6,25 +6,32 @@ import (
 	"testing"
 )
 
-func TestRunStatusReportsEmptyMigrationSet(t *testing.T) {
+func TestRunUsage(t *testing.T) {
+	for _, args := range [][]string{nil, {"down"}, {"up", "extra"}} {
+		var stdout, stderr bytes.Buffer
+		if code := run(args, &stdout, &stderr); code != 2 {
+			t.Fatalf("%v: code %d", args, code)
+		}
+	}
 	var stdout, stderr bytes.Buffer
-	if code := run([]string{"status"}, &stdout, &stderr); code != 0 {
-		t.Fatalf("run status code = %d, want 0; stderr = %q", code, stderr.String())
-	}
-	if !strings.Contains(stdout.String(), "no executable migrations") {
-		t.Fatalf("run status output = %q", stdout.String())
-	}
-	if stderr.Len() != 0 {
-		t.Fatalf("run status stderr = %q", stderr.String())
+	if code := run([]string{"help"}, &stdout, &stderr); code != 0 || !strings.Contains(stdout.String(), "status|up") {
+		t.Fatal("help failed")
 	}
 }
 
-func TestRunRejectsMutationBeforeMigrationFrameworkExists(t *testing.T) {
-	var stdout, stderr bytes.Buffer
-	if code := run([]string{"up"}, &stdout, &stderr); code != 2 {
-		t.Fatalf("run up code = %d, want 2", code)
-	}
-	if !strings.Contains(stderr.String(), "unknown migration command") {
-		t.Fatalf("run up stderr = %q", stderr.String())
+func TestRunRequiresSeparateSecretAndRedactsErrors(t *testing.T) {
+	for _, command := range []string{"status", "up"} {
+		for _, ref := range []string{"", "postgres://sensitive-value", "env:TPMP_TEST_MISSING", "env:TPMP_TEST_BAD_URL"} {
+			t.Setenv("TPMP_MIGRATION_DATABASE_URL_REF", ref)
+			t.Setenv("TPMP_TEST_MISSING", "")
+			t.Setenv("TPMP_TEST_BAD_URL", "postgres://sensitive-value:%invalid")
+			var stdout, stderr bytes.Buffer
+			if code := run([]string{command}, &stdout, &stderr); code != 1 {
+				t.Fatalf("code %d", code)
+			}
+			if strings.Contains(stderr.String(), "sensitive-value") || stdout.Len() != 0 {
+				t.Fatal("secret leaked")
+			}
+		}
 	}
 }

@@ -215,6 +215,18 @@
       "expires_on": "2026-11-29",
       "compensating_controls": "Exact commit identity, public checksum verification, and no direct production import.",
       "removal_plan": "Remove when upstream selects a tagged release or drops the dependency."
+    },
+    {
+      "kind": "pseudo-version",
+      "module": "github.com/jackc/pgservicefile",
+      "version": "v0.0.0-20240606120523-5a60cdf6a761",
+      "owner": "ThinkPixelMP maintainers",
+      "justification": "Pinned pgx PostgreSQL driver dependency; upstream publishes no tagged releases.",
+      "approval": "DB-001 dependency review: docs/evidence/db-001-migrations.md",
+      "created_on": "2026-09-05",
+      "expires_on": "2026-12-04",
+      "compensating_controls": "Exact commit and public checksum verification; confined to the administrative PostgreSQL adapter.",
+      "removal_plan": "Remove when pgx selects a tagged release or drops this dependency."
     }
   ]
 }

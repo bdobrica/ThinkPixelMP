@@ -109,6 +109,35 @@ func TestValidationBounds(t *testing.T) {
 	}
 }
 
+func TestOIDCConfigurationLoadingAndValidation(t *testing.T) {
+	cfg, err := Load(nil, []string{
+		"TPMP_OIDC_ISSUER=https://issuer.example.test/tenant",
+		"TPMP_OIDC_AUDIENCE=thinkpixelmp",
+		"TPMP_OIDC_ALLOWED_ALGORITHMS=RS256,ES256",
+		"TPMP_OIDC_CLOCK_SKEW=45s",
+		"TPMP_OIDC_DISCOVERY_TIMEOUT=3s",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.OIDC.Issuer != "https://issuer.example.test/tenant" || len(cfg.OIDC.AllowedAlgorithms) != 2 || cfg.OIDC.ClockSkew.String() != "45s" {
+		t.Fatalf("unexpected OIDC configuration: %s", cfg)
+	}
+
+	for name, args := range map[string][]string{
+		"insecure issuer":  {"--oidc-issuer=http://issuer.example.test", "--oidc-audience=mp", "--oidc-allowed-algorithms=RS256"},
+		"missing audience": {"--oidc-issuer=https://issuer.example.test", "--oidc-allowed-algorithms=RS256"},
+		"none algorithm":   {"--oidc-issuer=https://issuer.example.test", "--oidc-audience=mp", "--oidc-allowed-algorithms=none"},
+		"excessive skew":   {"--oidc-issuer=https://issuer.example.test", "--oidc-audience=mp", "--oidc-allowed-algorithms=RS256", "--oidc-clock-skew=6m"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(args, nil); err == nil {
+				t.Fatal("expected OIDC configuration error")
+			}
+		})
+	}
+}
+
 func TestConfigurationRenderingRedactsReferences(t *testing.T) {
 	const canary = "SECRET_REFERENCE_CANARY_9471"
 	ref, err := ParseSecretRef("env:" + canary)

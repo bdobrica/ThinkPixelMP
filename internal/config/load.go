@@ -19,8 +19,17 @@ type rawConfig struct {
 	Mode      *Mode         `json:"mode"`
 	HTTP      *rawHTTP      `json:"http"`
 	Database  *rawDatabase  `json:"database"`
+	OIDC      *rawOIDC      `json:"oidc"`
 	Log       *rawLog       `json:"log"`
 	Telemetry *rawTelemetry `json:"telemetry"`
+}
+
+type rawOIDC struct {
+	Issuer            *string   `json:"issuer"`
+	Audience          *string   `json:"audience"`
+	AllowedAlgorithms *[]string `json:"allowed_algorithms"`
+	ClockSkew         *string   `json:"clock_skew"`
+	DiscoveryTimeout  *string   `json:"discovery_timeout"`
 }
 
 type rawHTTP struct {
@@ -187,6 +196,30 @@ func (r rawConfig) apply(c *Config) error {
 			}
 		}
 	}
+	if r.OIDC != nil {
+		if r.OIDC.Issuer != nil {
+			c.OIDC.Issuer = *r.OIDC.Issuer
+		}
+		if r.OIDC.Audience != nil {
+			c.OIDC.Audience = *r.OIDC.Audience
+		}
+		if r.OIDC.AllowedAlgorithms != nil {
+			c.OIDC.AllowedAlgorithms = append([]string(nil), (*r.OIDC.AllowedAlgorithms)...)
+		}
+		for name, raw := range map[string]*string{"clock_skew": r.OIDC.ClockSkew, "discovery_timeout": r.OIDC.DiscoveryTimeout} {
+			if raw != nil {
+				d, err := time.ParseDuration(*raw)
+				if err != nil {
+					return fmt.Errorf("oidc.%s: invalid duration", name)
+				}
+				if name == "clock_skew" {
+					c.OIDC.ClockSkew = d
+				} else {
+					c.OIDC.DiscoveryTimeout = d
+				}
+			}
+		}
+	}
 	if r.Log != nil && r.Log.Level != nil {
 		c.Log.Level = *r.Log.Level
 	}
@@ -228,10 +261,22 @@ var environmentSetters = map[string]setter{
 	"TPMP_DATABASE_MAX_CONNECTION_IDLE_TIME": durationSetter("database.max_connection_idle_time", func(c *Config, d time.Duration) { c.Database.MaxConnectionIdleTime = d }),
 	"TPMP_DATABASE_MIN_CONNECTIONS":          intSetter("database.min_connections", 32, func(c *Config, v int64) { c.Database.MinConnections = int32(v) }),
 	"TPMP_DATABASE_MAX_CONNECTIONS":          intSetter("database.max_connections", 32, func(c *Config, v int64) { c.Database.MaxConnections = int32(v) }),
-	"TPMP_LOG_LEVEL":                         func(c *Config, v string) error { c.Log.Level = v; return nil },
-	"TPMP_TELEMETRY_MODE":                    func(c *Config, v string) error { c.Telemetry.Mode = v; return nil },
-	"TPMP_TELEMETRY_ENDPOINT":                func(c *Config, v string) error { c.Telemetry.Endpoint = v; return nil },
-	"TPMP_TELEMETRY_SERVICE_NAME":            func(c *Config, v string) error { c.Telemetry.ServiceName = v; return nil },
+	"TPMP_OIDC_ISSUER":                       func(c *Config, v string) error { c.OIDC.Issuer = v; return nil },
+	"TPMP_OIDC_AUDIENCE":                     func(c *Config, v string) error { c.OIDC.Audience = v; return nil },
+	"TPMP_OIDC_ALLOWED_ALGORITHMS": func(c *Config, v string) error {
+		if v == "" {
+			c.OIDC.AllowedAlgorithms = nil
+			return nil
+		}
+		c.OIDC.AllowedAlgorithms = strings.Split(v, ",")
+		return nil
+	},
+	"TPMP_OIDC_CLOCK_SKEW":        durationSetter("oidc.clock_skew", func(c *Config, d time.Duration) { c.OIDC.ClockSkew = d }),
+	"TPMP_OIDC_DISCOVERY_TIMEOUT": durationSetter("oidc.discovery_timeout", func(c *Config, d time.Duration) { c.OIDC.DiscoveryTimeout = d }),
+	"TPMP_LOG_LEVEL":              func(c *Config, v string) error { c.Log.Level = v; return nil },
+	"TPMP_TELEMETRY_MODE":         func(c *Config, v string) error { c.Telemetry.Mode = v; return nil },
+	"TPMP_TELEMETRY_ENDPOINT":     func(c *Config, v string) error { c.Telemetry.Endpoint = v; return nil },
+	"TPMP_TELEMETRY_SERVICE_NAME": func(c *Config, v string) error { c.Telemetry.ServiceName = v; return nil },
 	"TPMP_TELEMETRY_SAMPLE_RATIO": func(c *Config, v string) error {
 		n, e := strconv.ParseFloat(v, 64)
 		if e != nil {

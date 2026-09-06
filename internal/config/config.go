@@ -24,9 +24,18 @@ type Config struct {
 	Mode       Mode
 	HTTP       HTTPConfig
 	Database   DatabaseConfig
+	OIDC       OIDCConfig
 	Log        LogConfig
 	Telemetry  TelemetryConfig
 	ConfigFile string
+}
+
+type OIDCConfig struct {
+	Issuer            string        `json:"issuer,omitempty"`
+	Audience          string        `json:"audience,omitempty"`
+	AllowedAlgorithms []string      `json:"allowed_algorithms,omitempty"`
+	ClockSkew         time.Duration `json:"clock_skew"`
+	DiscoveryTimeout  time.Duration `json:"discovery_timeout"`
 }
 
 type HTTPConfig struct {
@@ -76,6 +85,7 @@ func Defaults() Config {
 			StatementTimeout: 10 * time.Second, LockTimeout: 2 * time.Second,
 			MaxConnectionLifetime: 30 * time.Minute, MaxConnectionIdleTime: 5 * time.Minute,
 			MinConnections: 0, MaxConnections: 20},
+		OIDC:      OIDCConfig{ClockSkew: 30 * time.Second, DiscoveryTimeout: 5 * time.Second},
 		Log:       LogConfig{Level: "info"},
 		Telemetry: TelemetryConfig{Mode: "noop", ServiceName: "thinkpixelmp", SampleRatio: 0},
 	}
@@ -112,6 +122,9 @@ func (c Config) Validate() error {
 	if c.Mode == ModeProduction && !c.Database.URL.IsSet() {
 		return errors.New("database.url: a secret reference is required in production")
 	}
+	if err := c.OIDC.validate(); err != nil {
+		return err
+	}
 	if c.Log.Level != "debug" && c.Log.Level != "info" && c.Log.Level != "warn" && c.Log.Level != "error" {
 		return errors.New("log.level: must be debug, info, warn, or error")
 	}
@@ -131,6 +144,42 @@ func (c Config) Validate() error {
 		}
 	} else if c.Telemetry.Endpoint != "" {
 		return errors.New("telemetry.endpoint: must be empty in noop mode")
+	}
+	return nil
+}
+
+func (c OIDCConfig) validate() error {
+	if c.ClockSkew < 0 || c.ClockSkew > 5*time.Minute {
+		return errors.New("oidc.clock_skew: must be between 0 and 5m")
+	}
+	if c.DiscoveryTimeout <= 0 || c.DiscoveryTimeout > time.Minute {
+		return errors.New("oidc.discovery_timeout: must be positive and at most 1m")
+	}
+	configured := c.Issuer != "" || c.Audience != "" || len(c.AllowedAlgorithms) != 0
+	if !configured {
+		return nil
+	}
+	u, err := url.Parse(c.Issuer)
+	if err != nil || u.Scheme != "https" || u.Host == "" || u.User != nil || u.RawQuery != "" || u.Fragment != "" {
+		return errors.New("oidc.issuer: must be an HTTPS URL without user information, query, or fragment")
+	}
+	if c.Audience == "" || len(c.Audience) > 512 {
+		return errors.New("oidc.audience: must contain 1 to 512 characters")
+	}
+	if len(c.AllowedAlgorithms) == 0 {
+		return errors.New("oidc.allowed_algorithms: at least one algorithm is required")
+	}
+	seen := make(map[string]struct{}, len(c.AllowedAlgorithms))
+	for _, algorithm := range c.AllowedAlgorithms {
+		switch algorithm {
+		case "RS256", "RS384", "RS512", "PS256", "PS384", "PS512", "ES256", "ES384", "ES512", "EdDSA":
+		default:
+			return fmt.Errorf("oidc.allowed_algorithms: unsupported algorithm %q", algorithm)
+		}
+		if _, exists := seen[algorithm]; exists {
+			return fmt.Errorf("oidc.allowed_algorithms: duplicate algorithm %q", algorithm)
+		}
+		seen[algorithm] = struct{}{}
 	}
 	return nil
 }
@@ -155,13 +204,14 @@ type safeConfig struct {
 		MaxConnections        int32               `json:"max_connections"`
 	} `json:"database"`
 	Log                  LogConfig       `json:"log"`
+	OIDC                 OIDCConfig      `json:"oidc"`
 	Telemetry            TelemetryConfig `json:"telemetry"`
 	ConfigFileConfigured bool            `json:"config_file_configured"`
 }
 
 func (c Config) safe() safeConfig {
 	var out safeConfig
-	out.Mode, out.HTTP, out.Log, out.Telemetry = c.Mode, c.HTTP, c.Log, c.Telemetry
+	out.Mode, out.HTTP, out.OIDC, out.Log, out.Telemetry = c.Mode, c.HTTP, c.OIDC, c.Log, c.Telemetry
 	out.Database.URL = safeSecretReference{Configured: c.Database.URL.IsSet(), Source: c.Database.URL.Source()}
 	out.Database.ConnectTimeout, out.Database.HealthTimeout = c.Database.ConnectTimeout, c.Database.HealthTimeout
 	out.Database.StatementTimeout, out.Database.LockTimeout = c.Database.StatementTimeout, c.Database.LockTimeout

@@ -24,6 +24,7 @@ gate passes.
 | OpenAPI | `3.1` | Canonical REST API description |
 | RFC 8785 JCS | RFC 8785 | Hashable JSON canonicalization |
 | Go | language/module baseline `1.26.0`; toolchain `1.26.7` | `go.mod` pins the exact development/build toolchain while retaining Go 1.26 language semantics; ORAS Go v2 supports Go 1.26 |
+| go-oidc | `v3.20.0` | OIDC discovery, rotating JWKS, compact JWT signature verification, and registered-claim parsing remain confined to the identity adapter |
 | Staticcheck | `2026.2.1` (`honnef.co/go/tools` `v0.8.1`) | Pinned static-analysis gate with Go 1.26 support |
 | govulncheck | `v1.7.0` | Official Go call-graph-aware vulnerability scanner |
 | go-licenses | `v2.0.1` | Classifies runtime and test dependency licenses against repository policy |

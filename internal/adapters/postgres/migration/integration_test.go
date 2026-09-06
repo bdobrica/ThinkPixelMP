@@ -6,12 +6,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
 	"sync"
 	"testing"
 	"testing/fstest"
+	"testing/quick"
 	"time"
 
 	postgres "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres"
@@ -1337,6 +1339,128 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		}
 		if preservedDigest != versionA.Digest().String() || preservedSemanticVersion != semantic.String() || preservedLifecycle != "active" {
 			t.Fatal("failed mutation changed the registered ArtifactVersion")
+		}
+	})
+	t.Run("artifact_version_identity_properties", func(t *testing.T) {
+		conn := newDB(t, "artifact_version_identity_property_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		parse := func(value string) shared.UUID {
+			parsed, err := shared.ParseUUID(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+		tenantID := parse("0198fc21-ced5-7000-8000-000000001000")
+		publisherID := parse("0198fc21-ced5-7000-8000-000000001001")
+		namespaceID := parse("0198fc21-ced5-7000-8000-000000001002")
+		artifactID := parse("0198fc21-ced5-7000-8000-000000001003")
+		now := time.Date(2026, 9, 6, 16, 0, 0, 0, time.UTC)
+		if _, err := conn.Exec(ctx, "INSERT INTO public.tenants (tenant_id) VALUES ($1::uuid)", tenantID.String()); err != nil {
+			t.Fatal(err)
+		}
+		publisherRepository, _ := postgrespublisher.NewRepository(conn)
+		if err := publisherRepository.Create(ctx, mustPublisher(t, tenantID, publisherID, "property-owner", now)); err != nil {
+			t.Fatal(err)
+		}
+		reason, _ := shared.NewReasonCode("ownership.confirmed")
+		if _, err := publisherRepository.ChangeState(ctx, tenantID, publisherID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		namespaceRepository, _ := postgresnamespace.NewRepository(conn)
+		namespace, err := domainnamespace.New(tenantID, namespaceID, "property-tests", publisherID, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := namespaceRepository.Create(ctx, namespace); err != nil {
+			t.Fatal(err)
+		}
+		artifactRepository, _ := postgresartifact.NewRepository(conn)
+		artifact, err := domainartifact.New(tenantID, artifactID, namespaceID, "property-tests", "immutable", domainartifact.KindSkill, "", "", "", "", nil, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := artifactRepository.Create(ctx, artifact); err != nil {
+			t.Fatal(err)
+		}
+		versionRepository, _ := postgresartifactversion.NewRepository(conn)
+		descriptorRepository, _ := postgresartifactdescriptor.NewRepository(conn)
+
+		caseNumber := 0
+		var propertyFailure string
+		property := func(contentSeed [32]byte, descriptorSeed [32]byte) bool {
+			caseNumber++
+			versionID := parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", caseNumber))
+			semantic, err := domainartifactversion.ParseSemanticVersion(fmt.Sprintf("1.0.%d", caseNumber))
+			if err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+			originalContent := append([]byte(fmt.Sprintf("registered-content-%d:", caseNumber)), contentSeed[:]...)
+			registeredDigest := shared.SHA256Digest(originalContent)
+			version, err := domainartifactversion.New(tenantID, versionID, artifactID, publisherID, semantic, registeredDigest, domainartifact.KindSkill, domainartifactversion.ClassInstructional, domainartifactversion.DeliveryOCI, now.Add(time.Duration(caseNumber)*time.Second))
+			if err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+			if err := versionRepository.Create(ctx, version); err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+
+			descriptorValue := fmt.Sprintf("%x", descriptorSeed)
+			normalized := []byte(fmt.Sprintf(`{"schema_version":1,"kind":"skill","artifact":{"namespace":"property-tests","name":"immutable","version":%q},"requirements":{},"dependencies":[],"spec":{"property":%q}}`, semantic.String(), descriptorValue))
+			descriptor, err := domainartifactdescriptor.New(tenantID, versionID, shared.SHA256Digest(normalized), "application/vnd.thinkpixel.skill.manifest.v1+json", normalized)
+			if err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+			if err := descriptorRepository.Create(ctx, descriptor); err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+
+			replacementDigest := shared.SHA256Digest(append([]byte("replacement-content:"), contentSeed[:]...))
+			if _, err := conn.Exec(ctx, `UPDATE public.artifact_versions SET resolved_digest = $3
+ WHERE tenant_id = $1::uuid AND artifact_version_id = $2::uuid`, tenantID.String(), versionID.String(), replacementDigest.String()); err == nil {
+				propertyFailure = "database allowed the registered content digest to change"
+				return false
+			}
+			replacementDescriptor := []byte(fmt.Sprintf(`{"schema_version":1,"kind":"skill","artifact":{"namespace":"property-tests","name":"immutable","version":%q},"requirements":{},"dependencies":[],"spec":{"replacement":%q}}`, semantic.String(), descriptorValue))
+			replacementDescriptorDigest := shared.SHA256Digest(replacementDescriptor)
+			if _, err := conn.Exec(ctx, `UPDATE public.artifact_descriptors SET descriptor_digest = $3
+ WHERE tenant_id = $1::uuid AND artifact_version_id = $2::uuid`, tenantID.String(), versionID.String(), replacementDescriptorDigest.String()); err == nil {
+				propertyFailure = "database allowed the descriptor digest to change"
+				return false
+			}
+			if _, err := conn.Exec(ctx, `UPDATE public.artifact_descriptors
+ SET descriptor_digest = $3, normalized_bytes = $4::bytea, normalized_metadata = $5::jsonb
+ WHERE tenant_id = $1::uuid AND artifact_version_id = $2::uuid`, tenantID.String(), versionID.String(), replacementDescriptorDigest.String(), replacementDescriptor, string(replacementDescriptor)); err == nil {
+				propertyFailure = "database allowed the registered descriptor identity to be replaced coherently"
+				return false
+			}
+
+			gotVersion, err := versionRepository.Get(ctx, tenantID, versionID)
+			if err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+			gotDescriptor, err := descriptorRepository.Get(ctx, tenantID, versionID)
+			if err != nil {
+				propertyFailure = err.Error()
+				return false
+			}
+			if gotVersion.Digest() != registeredDigest || gotDescriptor.DescriptorDigest() != descriptor.DescriptorDigest() || string(gotDescriptor.NormalizedMetadata()) != string(normalized) {
+				propertyFailure = "a rejected mutation changed persisted identity"
+				return false
+			}
+			return true
+		}
+		config := &quick.Config{MaxCount: 32, Rand: rand.New(rand.NewSource(21))} // #nosec G404 -- deterministic property-test generation.
+		if err := quick.Check(property, config); err != nil {
+			t.Fatalf("registered identity property failed: %s: %v", propertyFailure, err)
 		}
 	})
 	t.Run("concurrent_identity_registration", func(t *testing.T) {

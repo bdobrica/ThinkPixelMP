@@ -208,5 +208,12 @@ each delivery attempt, retries the failed attempt, and verifies that replay
 preserves the event ID, tenant sequence, payload, and payload digest. The first
 attempt's lease token cannot complete the replayed claim.
 
+ArtifactVersion identity property coverage generates distinct registered content
+and normalized descriptors, then attempts valid-looking replacement content
+digests, descriptor digests, and coherent descriptor byte/JSON pairs through an
+administrative connection. Every mutation is rejected by the database guards,
+and repository reads prove that the exact original content digest, descriptor
+digest, and normalized descriptor bytes remain unchanged.
+
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations or PostgreSQL repositories.

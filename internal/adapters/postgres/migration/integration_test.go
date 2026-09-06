@@ -1684,6 +1684,234 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		assertCounts(2, 2, 8)
 		assertCompleted("rollback-completion")
 	})
+	t.Run("concurrent_idempotency_outbox_replay", func(t *testing.T) {
+		conn := newDB(t, "concurrent_replay_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		parse := func(value string) shared.UUID {
+			t.Helper()
+			parsed, err := shared.ParseUUID(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+
+		tenantID := parse("0198fc21-ced5-7000-8000-000000000400")
+		now := time.Date(2026, 9, 6, 14, 0, 0, 0, time.UTC)
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s')", tenantID))
+		execSQL("CREATE ROLE db020_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.idempotency_records TO db020_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.tenant_event_sequences TO db020_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.outbox_messages TO db020_service")
+		execSQL("SET ROLE db020_service")
+
+		const contenders = 8
+		peers := make([]*pgx.Conn, contenders)
+		for index := range peers {
+			peer, err := connect("concurrent_replay_test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = peer.Close(context.Background()) })
+			if _, err := peer.Exec(ctx, "SET ROLE db020_service"); err != nil {
+				t.Fatal(err)
+			}
+			peers[index] = peer
+		}
+		runTogether := func(run func(int)) {
+			t.Helper()
+			ready := make(chan struct{}, contenders)
+			start := make(chan struct{})
+			var calls sync.WaitGroup
+			for index := range contenders {
+				calls.Go(func() {
+					ready <- struct{}{}
+					<-start
+					run(index)
+				})
+			}
+			for range contenders {
+				<-ready
+			}
+			close(start)
+			calls.Wait()
+		}
+
+		action, _ := shared.NewReasonCode("artifact_version.register")
+		requestDigest := shared.SHA256Digest([]byte(`{"artifact_id":"0198fc21-ced5-7000-8000-000000000401","version":"1.0.0"}`))
+		type acquireResult struct {
+			record  domainidempotency.Record
+			created bool
+			err     error
+		}
+		acquired := make(chan acquireResult, contenders)
+		runTogether(func(index int) {
+			repository, _ := postgresidempotency.NewRepository(peers[index])
+			candidate, _ := domainidempotency.New(tenantID,
+				parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", 0x410+index)),
+				"oidc:issuer:publisher", action, "concurrent-registration", requestDigest, now, now.Add(24*time.Hour))
+			record, created, err := repository.Acquire(ctx, candidate)
+			acquired <- acquireResult{record: record, created: created, err: err}
+		})
+		close(acquired)
+		var establishedID shared.UUID
+		acquiredIDs := make([]shared.UUID, 0, contenders)
+		createdCount := 0
+		for outcome := range acquired {
+			if outcome.err != nil {
+				t.Fatalf("concurrent idempotency acquire: %v", outcome.err)
+			}
+			if outcome.created {
+				createdCount++
+				establishedID = outcome.record.ID()
+			}
+			if outcome.record.RequestDigest() != requestDigest || outcome.record.State() != domainidempotency.StatePending {
+				t.Fatalf("concurrent idempotency acquire returned unexpected record: %#v", outcome.record)
+			}
+			acquiredIDs = append(acquiredIDs, outcome.record.ID())
+		}
+		if createdCount != 1 {
+			t.Fatalf("concurrent idempotency creates = %d, want 1", createdCount)
+		}
+		for _, acquiredID := range acquiredIDs {
+			if acquiredID != establishedID {
+				t.Fatalf("concurrent idempotency record ID = %s, want %s", acquiredID, establishedID)
+			}
+		}
+
+		result, _ := domainidempotency.NewResult(201, "artifact_version", "0198fc21-ced5-7000-8000-000000000401")
+		completed := make(chan domainidempotency.Record, contenders)
+		completionErrors := make(chan error, contenders)
+		runTogether(func(index int) {
+			repository, _ := postgresidempotency.NewRepository(peers[index])
+			record, err := repository.Complete(ctx, tenantID, "oidc:issuer:publisher", action,
+				"concurrent-registration", requestDigest, result, now.Add(time.Second))
+			completed <- record
+			completionErrors <- err
+		})
+		close(completed)
+		close(completionErrors)
+		for err := range completionErrors {
+			if err != nil {
+				t.Fatalf("concurrent idempotency completion replay: %v", err)
+			}
+		}
+		for record := range completed {
+			established, ok := record.Result()
+			resourceID, hasResource := established.ResourceID()
+			if record.ID() != establishedID || record.State() != domainidempotency.StateCompleted || !ok ||
+				established.Status() != 201 || !hasResource || resourceID != "0198fc21-ced5-7000-8000-000000000401" {
+				t.Fatalf("concurrent idempotency completion returned unexpected record: %#v", record)
+			}
+		}
+
+		messageID := parse("0198fc21-ced5-7000-8000-000000000420")
+		tx, err := conn.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = tx.Rollback(ctx) }()
+		if _, err := tx.Exec(ctx, `SELECT set_config('thinkpixelmp.tenant_id', $1, true)`, tenantID.String()); err != nil {
+			t.Fatal(err)
+		}
+		sequence, err := postgresoutbox.NextSequence(ctx, tx, tenantID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		payload := []byte(fmt.Sprintf(`{"specversion":"1.0","id":"%s","source":"urn:thinkpixel:mp:integration","type":"io.thinkpixel.mp.artifact.registered.v1","subject":"%s","time":"%s","datacontenttype":"%s","sequence":%d,"data":{"tenant_id":"%s","transaction_cursor":"cursor-%d","artifact_version_id":"%s","artifact_digest":"sha256:%s","descriptor_digest":"sha256:%s"}}`,
+			messageID.String(), messageID.String(), now.Format(time.RFC3339Nano), domainoutbox.DataContentType, sequence,
+			tenantID.String(), sequence, messageID.String(), strings.Repeat("a", 64), strings.Repeat("b", 64)))
+		message, err := domainoutbox.New(tenantID, messageID, sequence, "urn:thinkpixel:mp:integration",
+			"io.thinkpixel.mp.artifact.registered.v1", messageID.String(), payload, now)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := postgresoutbox.Record(ctx, tx, message); err != nil {
+			t.Fatal(err)
+		}
+		if err := tx.Commit(ctx); err != nil {
+			t.Fatal(err)
+		}
+
+		type claimResult struct {
+			index   int
+			token   shared.UUID
+			message domainoutbox.Message
+			err     error
+		}
+		claimConcurrently := func(at time.Time, tokenBase int) claimResult {
+			t.Helper()
+			claims := make(chan claimResult, contenders)
+			runTogether(func(index int) {
+				token := parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", tokenBase+index))
+				repository, _ := postgresoutbox.NewRepository(peers[index])
+				messages, err := repository.Claim(ctx, tenantID, fmt.Sprintf("worker-%d", index), token, at, time.Minute, 1)
+				outcome := claimResult{index: index, token: token, err: err}
+				if len(messages) == 1 {
+					outcome.message = messages[0]
+				} else if len(messages) > 1 {
+					outcome.err = fmt.Errorf("worker %d claimed %d messages", index, len(messages))
+				}
+				claims <- outcome
+			})
+			close(claims)
+			var winner claimResult
+			claimCount := 0
+			for outcome := range claims {
+				if outcome.err != nil {
+					t.Fatalf("concurrent outbox claim: %v", outcome.err)
+				}
+				if outcome.message.ID() == messageID {
+					winner = outcome
+					claimCount++
+				}
+			}
+			if claimCount != 1 {
+				t.Fatalf("concurrent outbox claims = %d, want 1", claimCount)
+			}
+			return winner
+		}
+
+		firstClaim := claimConcurrently(now.Add(2*time.Second), 0x430)
+		if firstClaim.message.Attempts() != 1 || firstClaim.message.Sequence() != message.Sequence() ||
+			firstClaim.message.PayloadDigest() != message.PayloadDigest() || string(firstClaim.message.Payload()) != string(message.Payload()) {
+			t.Fatalf("first outbox claim changed the logical event: %#v", firstClaim.message)
+		}
+		retryReason, _ := shared.NewReasonCode("sink.unavailable")
+		retryAt := now.Add(3 * time.Second)
+		firstRepository, _ := postgresoutbox.NewRepository(peers[firstClaim.index])
+		if _, err := firstRepository.Retry(ctx, tenantID, messageID, firstClaim.token, retryReason, retryAt); err != nil {
+			t.Fatal(err)
+		}
+
+		secondClaim := claimConcurrently(retryAt, 0x440)
+		if secondClaim.message.Attempts() != 2 || secondClaim.message.ID() != firstClaim.message.ID() ||
+			secondClaim.message.Sequence() != firstClaim.message.Sequence() ||
+			secondClaim.message.PayloadDigest() != firstClaim.message.PayloadDigest() ||
+			string(secondClaim.message.Payload()) != string(firstClaim.message.Payload()) {
+			t.Fatalf("outbox replay changed the logical event: %#v", secondClaim.message)
+		}
+		if _, err := firstRepository.Deliver(ctx, tenantID, messageID, firstClaim.token, retryAt.Add(time.Second)); typedCode(err) != "outbox.stale_claim" {
+			t.Fatalf("first delivery token after replay = %q: %v", typedCode(err), err)
+		}
+		secondRepository, _ := postgresoutbox.NewRepository(peers[secondClaim.index])
+		if _, err := secondRepository.Deliver(ctx, tenantID, messageID, secondClaim.token, retryAt.Add(time.Second)); err != nil {
+			t.Fatal(err)
+		}
+		stored, err := secondRepository.Get(ctx, tenantID, messageID)
+		if deliveredAt, ok := stored.DeliveredAt(); err != nil || stored.State() != domainoutbox.StateDelivered || !ok ||
+			stored.Attempts() != 2 || deliveredAt != retryAt.Add(time.Second) || stored.PayloadDigest() != message.PayloadDigest() {
+			t.Fatalf("delivered replay state: %#v %v", stored, err)
+		}
+	})
 	t.Run("idempotency_repository", func(t *testing.T) {
 		conn := newDB(t, "idempotency_test")
 		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {

@@ -200,5 +200,13 @@ claim, version, source, and audit facts together. Retrying the identical request
 and idempotency key then succeeds, demonstrating that a failed attempt neither
 publishes partial identity nor poisons replay ownership.
 
+Concurrent replay coverage races eight independent service-role connections over
+one idempotency ownership tuple. Exactly one call creates the pending record, and
+all concurrent completion calls observe the same established result. The same
+suite races eight outbox workers over one event, proves that only one worker owns
+each delivery attempt, retries the failed attempt, and verifies that replay
+preserves the event ID, tenant sequence, payload, and payload digest. The first
+attempt's lease token cannot complete the replayed claim.
+
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations or PostgreSQL repositories.

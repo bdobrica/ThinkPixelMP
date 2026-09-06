@@ -121,7 +121,7 @@ Completion metadata format:
 - [x] DB-009 Add ArtifactRequirement persistence. — completed 2026-09-05, commit 6cce195, evidence: `docs/evidence/db-009-artifact-requirements.md`; `GOCACHE=/tmp/thinkpixelmp-db009-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db009-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-010 Add ArtifactDependency persistence. — completed 2026-09-05, commit 6cce195, evidence: `docs/evidence/db-010-artifact-dependencies.md`; `GOCACHE=/tmp/thinkpixelmp-db010-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db010-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-011 Add AuditEvent schema and transactionally coupled mutation audit. — completed 2026-09-05, commit be4f21d, evidence: `docs/evidence/db-011-audit-events.md`; `GOCACHE=/tmp/thinkpixelmp-db011-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db011-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] DB-012 Add IdempotencyRecord with tenant/principal/action/request-digest ownership.
+- [x] DB-012 Add IdempotencyRecord with tenant/principal/action/request-digest ownership. — completed 2026-09-06, commit 51d6b25, evidence: `docs/evidence/db-012-idempotency-records.md`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make test-migrations`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] DB-013 Add transactional OutboxMessage with replay-safe claiming/retry/dead-letter metadata.
 - [ ] DB-014 Add transaction manager and repository interfaces.
 - [ ] DB-015 Add optimistic concurrency where mutable administrative state requires it.

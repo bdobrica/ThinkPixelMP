@@ -25,7 +25,7 @@ remain DB-014 and DB-020.
 
 ## Verification
 
-- `GOCACHE=/tmp/thinkpixelmp-db012-go-cache GOTOOLCHAIN=go1.26.7 go test -race ./internal/domain/idempotency ./internal/adapters/postgres/idempotency ./internal/adapters/postgres/migration ./cmd/migrate`
-- `GOCACHE=/tmp/thinkpixelmp-db012-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`
-- `GOCACHE=/tmp/thinkpixelmp-db012-go-cache GOTOOLCHAIN=go1.26.7 make verify`
+- workspace-local-cache `GOTOOLCHAIN=go1.26.7 go test ./internal/domain/idempotency ./internal/adapters/postgres/idempotency ./internal/adapters/postgres/migration`
+- workspace-local-cache `GOTOOLCHAIN=go1.26.7 make test-migrations`
+- workspace-local-cache `GOTOOLCHAIN=go1.26.7 make verify`
 - `git diff --check`

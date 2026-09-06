@@ -76,7 +76,11 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/PublisherPage'
+        '400':
+          $ref: '#/components/responses/Problem'
         '401':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
     post:
       tags:
@@ -90,7 +94,15 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/Publisher'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
         '409':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
   /publishers/{publisher_id}:
     get:
@@ -103,7 +115,13 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Publisher'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
         '404':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
   /publishers/{publisher_id}/state:
     post:

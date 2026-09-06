@@ -10,6 +10,22 @@ Both `suspended` and `revoked` block new publication, namespace mutation, and pr
 
 V1 publisher transitions are `claimed → verified | suspended | revoked`, `verified → suspended | revoked`, and `suspended → verified | revoked`. Revoked is terminal. Transitions require publisher administration, a strong ETag, and reason metadata.
 
+### Publisher API
+
+`POST /v1/publishers`, `GET /v1/publishers/{publisher_id}`, and
+`GET /v1/publishers` are authenticated and tenant scoped. Create requires the
+exact `publisher.manage` administrative action and an `Idempotency-Key`; reads
+do not infer administrative authority and expose only the authenticated
+tenant's Publisher records. Request bodies cannot select a tenant.
+
+Create begins in `claimed` state and atomically establishes its idempotency
+result with the Publisher and mutation audit record. Replaying the same caller,
+action, key, and canonical request returns the established resource; changing
+the request under that ownership tuple is a conflict. List order is ascending
+UUIDv7 Publisher ID with the API-wide default/maximum page sizes. Its opaque
+cursor is authenticated and bound to tenant, endpoint, page size, ordering, and
+expiry.
+
 ## Namespace
 
 A namespace is a tenant-scoped hierarchical path of lowercase DNS-style segments. Each segment matches:

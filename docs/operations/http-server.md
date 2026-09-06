@@ -18,6 +18,13 @@ Panic recovery emits a stable safe event and an RFC 7807 response when the respo
 
 Health and problem responses are `no-store`. These endpoints are intentionally unauthenticated as described by the OpenAPI contract; operators should expose them only on appropriately controlled infrastructure paths. API routes are mounted below `/v1/` and retain their own authentication and authorization responsibility.
 
+The Publisher API supplies a composable handler for create/read/list routes.
+It accepts only a valid Bearer form when authorization material is present,
+passes no credential data beyond the configured authenticator, derives tenant
+and principal only from the resulting identity, rejects unknown JSON and query
+fields, and emits bounded RFC 7807 errors. Publisher responses are private and
+non-cacheable; list cursors are opaque and tenant/query bound.
+
 ## Lifecycle
 
 `Server.Run` serves until cancellation or an unexpected listener failure. Cancellation initiates `http.Server.Shutdown` with the configured bounded timeout and waits for the serving goroutine to exit. The process owner remains responsible for initializing and shutting down tracing and other external resources around this lifecycle.

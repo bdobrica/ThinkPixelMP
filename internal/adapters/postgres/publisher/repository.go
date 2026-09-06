@@ -100,7 +100,9 @@ func (repository *Repository) get(ctx context.Context, tenantID shared.UUID, pre
 }
 
 func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, after *shared.UUID, limit int) ([]domain.Publisher, error) {
-	if limit < 1 || limit > domain.MaxListSize {
+	// One additional row is permitted for application-layer pagination
+	// lookahead; externally visible page sizes remain capped at MaxListSize.
+	if limit < 1 || limit > domain.MaxListSize+1 {
 		return nil, typed(shared.ErrorInvalid, "publisher.invalid_page_size")
 	}
 	if after != nil && !validUUID(*after) {

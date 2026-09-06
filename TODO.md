@@ -129,7 +129,7 @@ Completion metadata format:
 - [x] IAM-002 Implement claim-to-tenant/principal mapping. — completed 2026-09-06, commit cf049d8, evidence: `docs/evidence/iam-002-claim-mapping.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/adapters/oidc ./internal/config ./internal/ports/identity`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] IAM-003 Implement marketplace administrative roles/actions for publisher, namespace, publication, evidence producer, reviewer, catalog admin, revocation admin, federation admin. — completed 2026-09-06, evidence: `docs/evidence/iam-003-administrative-authorization.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/security ./internal/ports/authorization`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] IAM-004 Implement explicitly configured local development auth mode that cannot activate under production config accidentally. — completed 2026-09-06, evidence: `docs/evidence/iam-004-local-development-authentication.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/config ./internal/adapters/localauth ./internal/ports/identity`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] PUB-001 Implement Publisher create/read/list API.
+- [x] PUB-001 Implement Publisher create/read/list API. — completed 2026-09-06, evidence: `docs/evidence/pub-001-publisher-api.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/app/publication ./internal/adapters/http ./internal/adapters/oidc ./internal/adapters/postgres/publisher`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] PUB-002 Implement Namespace create/read/list API.
 - [ ] PUB-003 Implement namespace delegation/ownership checks.
 - [ ] PUB-004 Implement Artifact create/read/list API.

@@ -63,21 +63,21 @@ paths:
       operationId: listPublishers
       summary: List tenant publishers
       parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}]
-      responses: {'200': {$ref: '#/components/responses/PublisherPage'}, '401': {$ref: '#/components/responses/Problem'}}
+      responses: {'200': {$ref: '#/components/responses/PublisherPage'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
     post:
       tags: [Publishers]
       operationId: createPublisher
       summary: Create a tenant-local publisher
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {$ref: '#/components/requestBodies/PublisherCreate'}
-      responses: {'201': {$ref: '#/components/responses/Publisher'}, '409': {$ref: '#/components/responses/Problem'}}
+      responses: {'201': {$ref: '#/components/responses/Publisher'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
   /publishers/{publisher_id}:
     get:
       tags: [Publishers]
       operationId: getPublisher
       summary: Get a publisher
       parameters: [{$ref: '#/components/parameters/PublisherId'}]
-      responses: {'200': {$ref: '#/components/responses/Publisher'}, '404': {$ref: '#/components/responses/Problem'}}
+      responses: {'200': {$ref: '#/components/responses/Publisher'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
   /publishers/{publisher_id}/state:
     post:
       tags: [Publishers]

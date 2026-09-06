@@ -140,7 +140,7 @@ Completion metadata format:
 - [x] DB-019 Add rollback tests for partially completed registration. — completed 2026-09-06, evidence: `docs/evidence/db-019-partial-registration-rollback.md`; `GOTOOLCHAIN=go1.26.7 go test -count=1 -race -tags=dbintegration -run 'TestPostgres/partial_registration_rollback' ./internal/adapters/postgres/migration`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-020 Add concurrent idempotency/outbox replay tests. — completed 2026-09-06, evidence: `docs/evidence/db-020-concurrent-idempotency-outbox-replay.md`; `GOTOOLCHAIN=go1.26.7 go test -count=3 -race -tags=dbintegration -run 'TestPostgres/concurrent_idempotency_outbox_replay' ./internal/adapters/postgres/migration`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-021 Add property tests proving registered ArtifactVersion digest/descriptor identity cannot change. — completed 2026-09-06, evidence: `docs/evidence/db-021-artifact-version-identity-properties.md`; `GOTOOLCHAIN=go1.26.7 go test -count=1 -race -tags=dbintegration -run 'TestPostgres/artifact_version_identity_properties' ./internal/adapters/postgres/migration`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] DB-022 Commit Phase 2 with persistence/identity evidence.
+- [x] DB-022 Commit Phase 2 with persistence/identity evidence. — completed 2026-09-06, evidence: `docs/phase-2-evidence.md`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; evidence-link validation; `git diff --check`
 
 ---
 

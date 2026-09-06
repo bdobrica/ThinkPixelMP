@@ -129,21 +129,21 @@ paths:
       operationId: searchArtifacts
       summary: Search and filter tenant artifacts
       parameters: [{$ref: '#/components/parameters/Cursor'}, {$ref: '#/components/parameters/PageSize'}, {name: query, in: query, schema: {type: string, maxLength: 512}}]
-      responses: {'200': {$ref: '#/components/responses/ArtifactPage'}, '401': {$ref: '#/components/responses/Problem'}}
+      responses: {'200': {$ref: '#/components/responses/ArtifactPage'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
     post:
       tags: [Artifacts]
       operationId: createArtifact
       summary: Create a logical artifact
       parameters: [{$ref: '#/components/parameters/IdempotencyKey'}]
       requestBody: {$ref: '#/components/requestBodies/ArtifactCreate'}
-      responses: {'201': {$ref: '#/components/responses/Artifact'}, '409': {$ref: '#/components/responses/Problem'}}
+      responses: {'201': {$ref: '#/components/responses/Artifact'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '403': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}, '409': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
   /artifacts/{artifact_id}:
     get:
       tags: [Artifacts]
       operationId: getArtifact
       summary: Get a logical artifact
       parameters: [{$ref: '#/components/parameters/ArtifactId'}]
-      responses: {'200': {$ref: '#/components/responses/Artifact'}, '404': {$ref: '#/components/responses/Problem'}}
+      responses: {'200': {$ref: '#/components/responses/Artifact'}, '400': {$ref: '#/components/responses/Problem'}, '401': {$ref: '#/components/responses/Problem'}, '404': {$ref: '#/components/responses/Problem'}, '503': {$ref: '#/components/responses/Problem'}}
   /artifacts/{artifact_id}/versions:
     get:
       tags: [Artifacts]

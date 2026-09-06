@@ -6,6 +6,27 @@ An Artifact is a tenant-scoped logical identity named `{namespace}/{name}`. Its 
 
 Artifact kind is fixed when the logical Artifact is created. Versions cannot change the Artifact between `skill`, `agent-runtime`, `mcp-server`, `remote-agent`, or `bundle`; a different kind requires a different logical identity.
 
+## Artifact API
+
+`POST /v1/artifacts`, `GET /v1/artifacts/{artifact_id}`, and
+`GET /v1/artifacts` are authenticated and tenant scoped. Create requires the
+exact `publication.publish` administrative action and an `Idempotency-Key`.
+The named Namespace must exist in the authenticated tenant, and its live root
+owner must remain a verified Publisher when the logical Artifact is created.
+Request bodies cannot select a tenant.
+
+Create atomically establishes its idempotency result with the Artifact and
+mutation audit record. Replaying the same caller, action, key, and canonical
+request returns the established resource; changing the request under that
+ownership tuple is a conflict. List order is ascending UUIDv7 Artifact ID and
+supports bounded case-insensitive lexical matching over namespace path,
+artifact name, and display name. Its opaque cursor is authenticated and bound
+to tenant, endpoint, normalized query, page size, ordering, and expiry.
+
+Creating a logical Artifact does not register an ArtifactVersion, inspect or
+resolve a source, establish a content digest, grant runtime authority, or make
+content catalog eligible.
+
 ## Immutable version identity
 
 An ArtifactVersion binds:

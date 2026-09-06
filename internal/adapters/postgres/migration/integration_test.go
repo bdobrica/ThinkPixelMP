@@ -753,9 +753,13 @@ func TestPostgres(t *testing.T) {
 		if err != nil || got.ID() != artifactAID || got.Kind() != domainartifact.KindSkill || got.Labels()["security/tier"] != "reviewed" {
 			t.Fatalf("get: %#v %v", got, err)
 		}
-		values, err := repository.List(ctx, tenantA, nil, 50)
+		values, err := repository.List(ctx, tenantA, "review", nil, 50)
 		if err != nil || len(values) != 1 || values[0].TenantID() != tenantA {
 			t.Fatalf("tenant list: %#v %v", values, err)
+		}
+		values, err = repository.List(ctx, tenantA, "%", nil, 50)
+		if err != nil || len(values) != 0 {
+			t.Fatalf("literal wildcard query: %#v %v", values, err)
 		}
 		if _, err := repository.Get(ctx, tenantA, artifactBID); typedClass(err) != shared.ErrorNotFound {
 			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)

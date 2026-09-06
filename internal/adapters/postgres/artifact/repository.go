@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	postgres "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres"
@@ -115,7 +116,7 @@ func (repository *Repository) get(ctx context.Context, tenantID shared.UUID, pre
 	return value, nil
 }
 
-func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, after *shared.UUID, limit int) ([]domain.Artifact, error) {
+func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, queryText string, after *shared.UUID, limit int) ([]domain.Artifact, error) {
 	if limit < 1 || limit > domain.MaxListSize {
 		return nil, typed(shared.ErrorInvalid, "artifact.invalid_page_size")
 	}
@@ -127,10 +128,12 @@ func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, af
 		return nil, err
 	}
 	defer rollback(tx)
-	query := artifactSelect + ` WHERE a.tenant_id = $1::uuid`
-	arguments := []any{tenantID.String()}
+	query := artifactSelect + ` WHERE a.tenant_id = $1::uuid
+   AND ($2 = '' OR n.path ILIKE '%' || $2 || '%' ESCAPE '\' OR a.name ILIKE '%' || $2 || '%' ESCAPE '\'
+        OR COALESCE(a.display_name, '') ILIKE '%' || $2 || '%' ESCAPE '\')`
+	arguments := []any{tenantID.String(), escapeLike(queryText)}
 	if after != nil {
-		query += ` AND a.artifact_id > $2::uuid`
+		query += ` AND a.artifact_id > $3::uuid`
 		arguments = append(arguments, after.String())
 	}
 	arguments = append(arguments, limit)
@@ -155,6 +158,12 @@ func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, af
 		return nil, unavailable()
 	}
 	return values, nil
+}
+
+func escapeLike(value string) string {
+	value = strings.ReplaceAll(value, `\`, `\\`)
+	value = strings.ReplaceAll(value, `%`, `\%`)
+	return strings.ReplaceAll(value, `_`, `\_`)
 }
 
 func (repository *Repository) begin(ctx context.Context, tenantID shared.UUID) (pgx.Tx, error) {

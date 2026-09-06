@@ -132,7 +132,7 @@ Completion metadata format:
 - [x] PUB-001 Implement Publisher create/read/list API. — completed 2026-09-06, evidence: `docs/evidence/pub-001-publisher-api.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/app/publication ./internal/adapters/http ./internal/adapters/oidc ./internal/adapters/postgres/publisher`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] PUB-002 Implement Namespace create/read/list API. — completed 2026-09-06, evidence: `docs/evidence/pub-002-namespace-api.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/app/publication ./internal/adapters/http ./internal/adapters/postgres/namespace`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] PUB-003 Implement namespace delegation/ownership checks. — completed 2026-09-06, evidence: `docs/evidence/pub-003-namespace-delegation.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/domain/namespace ./internal/domain/outbox ./internal/app/publication ./internal/adapters/postgres/namespace`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] PUB-004 Implement Artifact create/read/list API.
+- [x] PUB-004 Implement Artifact create/read/list API. — completed 2026-09-06, evidence: `docs/evidence/pub-004-artifact-api.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/app/publication ./internal/adapters/http ./internal/adapters/postgres/artifact ./internal/domain/artifact`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] PUB-005 Implement ArtifactVersion registration skeleton requiring immutable digest/source data.
 - [ ] DB-016 Add migration-from-empty tests against real pinned PostgreSQL.
 - [ ] DB-017 Add tenant-isolation tests across all repositories.

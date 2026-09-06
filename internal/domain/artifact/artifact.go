@@ -60,7 +60,7 @@ type Repository interface {
 	Create(context.Context, Artifact) error
 	Get(context.Context, shared.UUID, shared.UUID) (Artifact, error)
 	GetByIdentity(context.Context, shared.UUID, shared.ArtifactReference) (Artifact, error)
-	List(context.Context, shared.UUID, *shared.UUID, int) ([]Artifact, error)
+	List(context.Context, shared.UUID, string, *shared.UUID, int) ([]Artifact, error)
 }
 
 func New(tenantID, id, namespaceID shared.UUID, namespacePath, name string, kind Kind, displayName, description, homepage, repository string, labels map[string]string, createdAt time.Time) (Artifact, error) {

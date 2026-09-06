@@ -255,7 +255,11 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/ArtifactPage'
+        '400':
+          $ref: '#/components/responses/Problem'
         '401':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
     post:
       tags:
@@ -269,7 +273,17 @@ paths:
       responses:
         '201':
           $ref: '#/components/responses/Artifact'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
+        '403':
+          $ref: '#/components/responses/Problem'
+        '404':
+          $ref: '#/components/responses/Problem'
         '409':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
   /artifacts/{artifact_id}:
     get:
@@ -282,7 +296,13 @@ paths:
       responses:
         '200':
           $ref: '#/components/responses/Artifact'
+        '400':
+          $ref: '#/components/responses/Problem'
+        '401':
+          $ref: '#/components/responses/Problem'
         '404':
+          $ref: '#/components/responses/Problem'
+        '503':
           $ref: '#/components/responses/Problem'
   /artifacts/{artifact_id}/versions:
     get:

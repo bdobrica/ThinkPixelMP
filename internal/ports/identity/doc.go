@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"time"
+
+	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 )
 
 // VerifiedToken is the cryptographically verified identity assertion consumed
@@ -23,4 +25,18 @@ type VerifiedToken struct {
 // not assign a tenant, principal, role, or administrative authority.
 type Verifier interface {
 	Verify(context.Context, string) (VerifiedToken, error)
+}
+
+// Identity is the tenant-scoped principal established from a verified token
+// through operator-controlled mapping configuration. PrincipalID is opaque and
+// safe to use as the actor and idempotency owner identifier.
+type Identity struct {
+	TenantID    shared.UUID
+	PrincipalID string
+}
+
+// Mapper assigns marketplace tenant and principal identity from verified
+// claims. It does not grant roles or administrative authority.
+type Mapper interface {
+	Map(VerifiedToken) (Identity, error)
 }

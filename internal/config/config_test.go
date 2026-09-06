@@ -7,6 +7,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestDefaultsAreSafeAndValid(t *testing.T) {
@@ -116,11 +117,15 @@ func TestOIDCConfigurationLoadingAndValidation(t *testing.T) {
 		"TPMP_OIDC_ALLOWED_ALGORITHMS=RS256,ES256",
 		"TPMP_OIDC_CLOCK_SKEW=45s",
 		"TPMP_OIDC_DISCOVERY_TIMEOUT=3s",
+		"TPMP_OIDC_TENANT_CLAIM=groups",
+		"TPMP_OIDC_PRINCIPAL_CLAIM=employee_id",
+		`TPMP_OIDC_TENANT_MAPPINGS=[{"claim_value":"marketplace-a","tenant_id":"0198fc21-ced5-7000-8000-000000000001"}]`,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if cfg.OIDC.Issuer != "https://issuer.example.test/tenant" || len(cfg.OIDC.AllowedAlgorithms) != 2 || cfg.OIDC.ClockSkew.String() != "45s" {
+	if cfg.OIDC.Issuer != "https://issuer.example.test/tenant" || len(cfg.OIDC.AllowedAlgorithms) != 2 || cfg.OIDC.ClockSkew.String() != "45s" ||
+		cfg.OIDC.TenantClaim != "groups" || cfg.OIDC.PrincipalClaim != "employee_id" || len(cfg.OIDC.TenantMappings) != 1 {
 		t.Fatalf("unexpected OIDC configuration: %s", cfg)
 	}
 
@@ -133,6 +138,41 @@ func TestOIDCConfigurationLoadingAndValidation(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			if _, err := Load(args, nil); err == nil {
 				t.Fatal("expected OIDC configuration error")
+			}
+		})
+	}
+}
+
+func TestOIDCMappingConfigurationValidationAndRedaction(t *testing.T) {
+	const canary = "SENSITIVE_CLAIM_VALUE_9471"
+	base := func() Config {
+		cfg := Defaults()
+		cfg.OIDC = OIDCConfig{Issuer: "https://issuer.example.test", Audience: "thinkpixelmp",
+			AllowedAlgorithms: []string{"RS256"}, ClockSkew: 30 * time.Second, DiscoveryTimeout: 5 * time.Second,
+			TenantClaim: "groups", PrincipalClaim: "employee_id",
+			TenantMappings: []OIDCTenantMappingConfig{{ClaimValue: canary, TenantID: "0198fc21-ced5-7000-8000-000000000001"}}}
+		return cfg
+	}
+	if err := base().Validate(); err != nil {
+		t.Fatal(err)
+	}
+	if rendered := base().String(); strings.Contains(rendered, canary) || !strings.Contains(rendered, `"tenant_mapping_count":1`) {
+		t.Fatalf("mapping values were exposed or count absent: %s", rendered)
+	}
+	for name, mutate := range map[string]func(*Config){
+		"missing tenant claim":    func(c *Config) { c.OIDC.TenantClaim = "" },
+		"missing principal claim": func(c *Config) { c.OIDC.PrincipalClaim = "" },
+		"missing mappings":        func(c *Config) { c.OIDC.TenantMappings = nil },
+		"invalid tenant ID":       func(c *Config) { c.OIDC.TenantMappings[0].TenantID = "not-a-uuid" },
+		"duplicate value": func(c *Config) {
+			c.OIDC.TenantMappings = append(c.OIDC.TenantMappings, c.OIDC.TenantMappings[0])
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			cfg := base()
+			mutate(&cfg)
+			if err := cfg.Validate(); err == nil {
+				t.Fatal("expected mapping validation error")
 			}
 		})
 	}

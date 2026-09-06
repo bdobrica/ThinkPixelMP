@@ -8,7 +8,11 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"strings"
 	"time"
+	"unicode/utf8"
+
+	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 )
 
 // Mode selects validation rules for disposable development or production.
@@ -31,11 +35,19 @@ type Config struct {
 }
 
 type OIDCConfig struct {
-	Issuer            string        `json:"issuer,omitempty"`
-	Audience          string        `json:"audience,omitempty"`
-	AllowedAlgorithms []string      `json:"allowed_algorithms,omitempty"`
-	ClockSkew         time.Duration `json:"clock_skew"`
-	DiscoveryTimeout  time.Duration `json:"discovery_timeout"`
+	Issuer            string                    `json:"issuer,omitempty"`
+	Audience          string                    `json:"audience,omitempty"`
+	AllowedAlgorithms []string                  `json:"allowed_algorithms,omitempty"`
+	ClockSkew         time.Duration             `json:"clock_skew"`
+	DiscoveryTimeout  time.Duration             `json:"discovery_timeout"`
+	TenantClaim       string                    `json:"tenant_claim,omitempty"`
+	PrincipalClaim    string                    `json:"principal_claim,omitempty"`
+	TenantMappings    []OIDCTenantMappingConfig `json:"tenant_mappings,omitempty"`
+}
+
+type OIDCTenantMappingConfig struct {
+	ClaimValue string `json:"claim_value"`
+	TenantID   string `json:"tenant_id"`
 }
 
 type HTTPConfig struct {
@@ -155,7 +167,8 @@ func (c OIDCConfig) validate() error {
 	if c.DiscoveryTimeout <= 0 || c.DiscoveryTimeout > time.Minute {
 		return errors.New("oidc.discovery_timeout: must be positive and at most 1m")
 	}
-	configured := c.Issuer != "" || c.Audience != "" || len(c.AllowedAlgorithms) != 0
+	configured := c.Issuer != "" || c.Audience != "" || len(c.AllowedAlgorithms) != 0 ||
+		c.TenantClaim != "" || c.PrincipalClaim != "" || len(c.TenantMappings) != 0
 	if !configured {
 		return nil
 	}
@@ -181,6 +194,35 @@ func (c OIDCConfig) validate() error {
 		}
 		seen[algorithm] = struct{}{}
 	}
+	if err := validateOIDCClaimText(c.TenantClaim, 128); err != nil {
+		return fmt.Errorf("oidc.tenant_claim: %w", err)
+	}
+	if err := validateOIDCClaimText(c.PrincipalClaim, 128); err != nil {
+		return fmt.Errorf("oidc.principal_claim: %w", err)
+	}
+	if len(c.TenantMappings) == 0 || len(c.TenantMappings) > 10000 {
+		return errors.New("oidc.tenant_mappings: must contain 1 to 10000 entries")
+	}
+	claimValues := make(map[string]struct{}, len(c.TenantMappings))
+	for index, mapping := range c.TenantMappings {
+		if err := validateOIDCClaimText(mapping.ClaimValue, 1024); err != nil {
+			return fmt.Errorf("oidc.tenant_mappings[%d].claim_value: %w", index, err)
+		}
+		if _, duplicate := claimValues[mapping.ClaimValue]; duplicate {
+			return fmt.Errorf("oidc.tenant_mappings[%d].claim_value: duplicate value", index)
+		}
+		claimValues[mapping.ClaimValue] = struct{}{}
+		if _, err := shared.ParseUUID(mapping.TenantID); err != nil {
+			return fmt.Errorf("oidc.tenant_mappings[%d].tenant_id: %w", index, err)
+		}
+	}
+	return nil
+}
+
+func validateOIDCClaimText(value string, maximum int) error {
+	if len(value) == 0 || len(value) > maximum || !utf8.ValidString(value) || strings.IndexFunc(value, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
+		return fmt.Errorf("must contain 1 to %d valid UTF-8 bytes without control characters", maximum)
+	}
 	return nil
 }
 
@@ -204,14 +246,29 @@ type safeConfig struct {
 		MaxConnections        int32               `json:"max_connections"`
 	} `json:"database"`
 	Log                  LogConfig       `json:"log"`
-	OIDC                 OIDCConfig      `json:"oidc"`
+	OIDC                 safeOIDCConfig  `json:"oidc"`
 	Telemetry            TelemetryConfig `json:"telemetry"`
 	ConfigFileConfigured bool            `json:"config_file_configured"`
 }
 
+type safeOIDCConfig struct {
+	Issuer             string        `json:"issuer,omitempty"`
+	Audience           string        `json:"audience,omitempty"`
+	AllowedAlgorithms  []string      `json:"allowed_algorithms,omitempty"`
+	ClockSkew          time.Duration `json:"clock_skew"`
+	DiscoveryTimeout   time.Duration `json:"discovery_timeout"`
+	TenantClaim        string        `json:"tenant_claim,omitempty"`
+	PrincipalClaim     string        `json:"principal_claim,omitempty"`
+	TenantMappingCount int           `json:"tenant_mapping_count"`
+}
+
 func (c Config) safe() safeConfig {
 	var out safeConfig
-	out.Mode, out.HTTP, out.OIDC, out.Log, out.Telemetry = c.Mode, c.HTTP, c.OIDC, c.Log, c.Telemetry
+	out.Mode, out.HTTP, out.Log, out.Telemetry = c.Mode, c.HTTP, c.Log, c.Telemetry
+	out.OIDC = safeOIDCConfig{Issuer: c.OIDC.Issuer, Audience: c.OIDC.Audience,
+		AllowedAlgorithms: append([]string(nil), c.OIDC.AllowedAlgorithms...), ClockSkew: c.OIDC.ClockSkew,
+		DiscoveryTimeout: c.OIDC.DiscoveryTimeout, TenantClaim: c.OIDC.TenantClaim,
+		PrincipalClaim: c.OIDC.PrincipalClaim, TenantMappingCount: len(c.OIDC.TenantMappings)}
 	out.Database.URL = safeSecretReference{Configured: c.Database.URL.IsSet(), Source: c.Database.URL.Source()}
 	out.Database.ConnectTimeout, out.Database.HealthTimeout = c.Database.ConnectTimeout, c.Database.HealthTimeout
 	out.Database.StatementTimeout, out.Database.LockTimeout = c.Database.StatementTimeout, c.Database.LockTimeout

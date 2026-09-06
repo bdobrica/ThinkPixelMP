@@ -25,11 +25,14 @@ type rawConfig struct {
 }
 
 type rawOIDC struct {
-	Issuer            *string   `json:"issuer"`
-	Audience          *string   `json:"audience"`
-	AllowedAlgorithms *[]string `json:"allowed_algorithms"`
-	ClockSkew         *string   `json:"clock_skew"`
-	DiscoveryTimeout  *string   `json:"discovery_timeout"`
+	Issuer            *string                    `json:"issuer"`
+	Audience          *string                    `json:"audience"`
+	AllowedAlgorithms *[]string                  `json:"allowed_algorithms"`
+	ClockSkew         *string                    `json:"clock_skew"`
+	DiscoveryTimeout  *string                    `json:"discovery_timeout"`
+	TenantClaim       *string                    `json:"tenant_claim"`
+	PrincipalClaim    *string                    `json:"principal_claim"`
+	TenantMappings    *[]OIDCTenantMappingConfig `json:"tenant_mappings"`
 }
 
 type rawHTTP struct {
@@ -206,6 +209,15 @@ func (r rawConfig) apply(c *Config) error {
 		if r.OIDC.AllowedAlgorithms != nil {
 			c.OIDC.AllowedAlgorithms = append([]string(nil), (*r.OIDC.AllowedAlgorithms)...)
 		}
+		if r.OIDC.TenantClaim != nil {
+			c.OIDC.TenantClaim = *r.OIDC.TenantClaim
+		}
+		if r.OIDC.PrincipalClaim != nil {
+			c.OIDC.PrincipalClaim = *r.OIDC.PrincipalClaim
+		}
+		if r.OIDC.TenantMappings != nil {
+			c.OIDC.TenantMappings = append([]OIDCTenantMappingConfig(nil), (*r.OIDC.TenantMappings)...)
+		}
 		for name, raw := range map[string]*string{"clock_skew": r.OIDC.ClockSkew, "discovery_timeout": r.OIDC.DiscoveryTimeout} {
 			if raw != nil {
 				d, err := time.ParseDuration(*raw)
@@ -273,6 +285,22 @@ var environmentSetters = map[string]setter{
 	},
 	"TPMP_OIDC_CLOCK_SKEW":        durationSetter("oidc.clock_skew", func(c *Config, d time.Duration) { c.OIDC.ClockSkew = d }),
 	"TPMP_OIDC_DISCOVERY_TIMEOUT": durationSetter("oidc.discovery_timeout", func(c *Config, d time.Duration) { c.OIDC.DiscoveryTimeout = d }),
+	"TPMP_OIDC_TENANT_CLAIM":      func(c *Config, v string) error { c.OIDC.TenantClaim = v; return nil },
+	"TPMP_OIDC_PRINCIPAL_CLAIM":   func(c *Config, v string) error { c.OIDC.PrincipalClaim = v; return nil },
+	"TPMP_OIDC_TENANT_MAPPINGS": func(c *Config, v string) error {
+		var mappings []OIDCTenantMappingConfig
+		decoder := json.NewDecoder(strings.NewReader(v))
+		decoder.DisallowUnknownFields()
+		if err := decoder.Decode(&mappings); err != nil {
+			return errors.New("oidc.tenant_mappings: invalid JSON array")
+		}
+		var extra any
+		if err := decoder.Decode(&extra); !errors.Is(err, io.EOF) {
+			return errors.New("oidc.tenant_mappings: invalid JSON array")
+		}
+		c.OIDC.TenantMappings = mappings
+		return nil
+	},
 	"TPMP_LOG_LEVEL":              func(c *Config, v string) error { c.Log.Level = v; return nil },
 	"TPMP_TELEMETRY_MODE":         func(c *Config, v string) error { c.Telemetry.Mode = v; return nil },
 	"TPMP_TELEMETRY_ENDPOINT":     func(c *Config, v string) error { c.Telemetry.Endpoint = v; return nil },

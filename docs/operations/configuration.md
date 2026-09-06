@@ -31,6 +31,14 @@ Unknown JSON fields, `TPMP_*` variables, flags, positional arguments, malformed 
 | `database.max_connection_idle_time` | `TPMP_DATABASE_MAX_CONNECTION_IDLE_TIME` | `--database-max-connection-idle-time` |
 | `database.min_connections` | `TPMP_DATABASE_MIN_CONNECTIONS` | `--database-min-connections` |
 | `database.max_connections` | `TPMP_DATABASE_MAX_CONNECTIONS` | `--database-max-connections` |
+| `oidc.issuer` | `TPMP_OIDC_ISSUER` | `--oidc-issuer` |
+| `oidc.audience` | `TPMP_OIDC_AUDIENCE` | `--oidc-audience` |
+| `oidc.allowed_algorithms` | `TPMP_OIDC_ALLOWED_ALGORITHMS` | `--oidc-allowed-algorithms` |
+| `oidc.clock_skew` | `TPMP_OIDC_CLOCK_SKEW` | `--oidc-clock-skew` |
+| `oidc.discovery_timeout` | `TPMP_OIDC_DISCOVERY_TIMEOUT` | `--oidc-discovery-timeout` |
+| `oidc.tenant_claim` | `TPMP_OIDC_TENANT_CLAIM` | `--oidc-tenant-claim` |
+| `oidc.principal_claim` | `TPMP_OIDC_PRINCIPAL_CLAIM` | `--oidc-principal-claim` |
+| `oidc.tenant_mappings` | `TPMP_OIDC_TENANT_MAPPINGS` | `--oidc-tenant-mappings` |
 | `log.level` | `TPMP_LOG_LEVEL` | `--log-level` |
 | `telemetry.mode` | `TPMP_TELEMETRY_MODE` | `--telemetry-mode` |
 | `telemetry.endpoint` | `TPMP_TELEMETRY_ENDPOINT` | `--telemetry-endpoint` |
@@ -64,4 +72,10 @@ Example development file:
 }
 ```
 
-Future OIDC, registry, policy, federation, evidence-provider, and other integration settings will be added with their owning contracts. They are intentionally not accepted as untyped extension data.
+OIDC tenant mappings use a JSON array for file, environment, and flag input;
+see [OIDC authentication configuration](authentication.md). Mapping values and
+tenant IDs are omitted from safe configuration output.
+
+Future registry, policy, federation, evidence-provider, and other integration
+settings will be added with their owning contracts. They are intentionally not
+accepted as untyped extension data.

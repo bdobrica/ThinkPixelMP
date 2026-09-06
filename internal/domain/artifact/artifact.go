@@ -55,6 +55,7 @@ type Artifact struct {
 }
 
 // Repository is the tenant-scoped persistence boundary for logical Artifacts.
+// Its operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, Artifact) error
 	Get(context.Context, shared.UUID, shared.UUID) (Artifact, error)

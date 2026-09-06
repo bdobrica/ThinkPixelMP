@@ -62,12 +62,21 @@ type Message struct {
 	createdAt      time.Time
 }
 
+// Repository is the tenant-scoped delivery boundary for outbox messages. Its
+// operations join a transaction carried by context when supported.
 type Repository interface {
 	Get(context.Context, shared.UUID, shared.UUID) (Message, error)
 	Claim(context.Context, shared.UUID, string, shared.UUID, time.Time, time.Duration, int) ([]Message, error)
 	Retry(context.Context, shared.UUID, shared.UUID, shared.UUID, shared.ReasonCode, time.Time) (Message, error)
 	Deliver(context.Context, shared.UUID, shared.UUID, shared.UUID, time.Time) (Message, error)
 	DeadLetter(context.Context, shared.UUID, shared.UUID, shared.UUID, shared.ReasonCode, time.Time) (Message, error)
+}
+
+// Writer appends an immutable message using a sequence allocated in the same
+// application transaction. Calls outside a transaction must fail closed.
+type Writer interface {
+	NextSequence(context.Context, shared.UUID) (uint64, error)
+	Record(context.Context, Message) error
 }
 
 type envelope struct {

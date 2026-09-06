@@ -14,6 +14,7 @@ import (
 	"testing/fstest"
 	"time"
 
+	postgres "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres"
 	postgresartifact "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifact"
 	postgresartifactdependency "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactdependency"
 	postgresartifactdescriptor "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactdescriptor"
@@ -172,6 +173,149 @@ func TestPostgres(t *testing.T) {
 			if _, err := Run(ctx, conn, migrations.Files, apply); err == nil {
 				t.Fatal("accepted checksum drift")
 			}
+		}
+	})
+	t.Run("transaction_manager", func(t *testing.T) {
+		conn := newDB(t, "transaction_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		parse := func(value string) shared.UUID {
+			t.Helper()
+			parsed, err := shared.ParseUUID(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+
+		tenantID := parse("0198fc21-ced5-7000-8000-000000000002")
+		otherTenantID := parse("0198fc21-ced5-7000-8000-000000000003")
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s'), ('%s')", tenantID.String(), otherTenantID.String()))
+		execSQL("CREATE ROLE db014_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT ON public.tenants TO db014_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db014_service")
+		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db014_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db014_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.idempotency_records TO db014_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.tenant_event_sequences TO db014_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.outbox_messages TO db014_service")
+		execSQL("SET ROLE db014_service")
+
+		manager, err := postgres.NewTransactionManager(conn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		publisherRepository, _ := postgrespublisher.NewRepository(conn)
+		idempotencyRepository, _ := postgresidempotency.NewRepository(conn)
+		auditRepository, _ := postgresaudit.NewRepository(conn)
+		outboxRepository, _ := postgresoutbox.NewRepository(conn)
+		now := time.Date(2026, 9, 6, 15, 0, 0, 0, time.UTC)
+		digest, _ := shared.ParseDigest("sha256:" + strings.Repeat("d", 64))
+		action, _ := shared.NewReasonCode("publisher.create")
+		publisherID := parse("0198fc21-ced5-7000-8000-000000000004")
+		recordID := parse("0198fc21-ced5-7000-8000-000000000005")
+		publisher, _ := domainpublisher.New(tenantID, publisherID, "atomic-rollback", "", "", now)
+		record, _ := domainidempotency.New(tenantID, recordID, "integration:test-principal", action, "rollback-key", digest, now, now.Add(24*time.Hour))
+		if _, err := outboxRepository.NextSequence(ctx, tenantID); typedClass(err) != shared.ErrorInvalid {
+			t.Fatalf("outbox sequence outside transaction class = %q: %v", typedClass(err), err)
+		}
+		rollbackMessageID := parse("0198fc21-ced5-7000-8000-000000000008")
+		message := func(id shared.UUID, sequence uint64) domainoutbox.Message {
+			t.Helper()
+			payload := []byte(fmt.Sprintf(`{"specversion":"1.0","id":"%s","source":"urn:thinkpixel:mp:integration","type":"io.thinkpixel.mp.artifact.registered.v1","subject":"%s","time":"%s","datacontenttype":"%s","sequence":%d,"data":{"tenant_id":"%s","transaction_cursor":"cursor-%d","artifact_version_id":"%s","artifact_digest":"sha256:%s","descriptor_digest":"sha256:%s"}}`,
+				id.String(), id.String(), now.Format(time.RFC3339Nano), domainoutbox.DataContentType, sequence,
+				tenantID.String(), sequence, id.String(), strings.Repeat("a", 64), strings.Repeat("b", 64)))
+			value, err := domainoutbox.New(tenantID, id, sequence, "urn:thinkpixel:mp:integration", "io.thinkpixel.mp.artifact.registered.v1", id.String(), payload, now)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return value
+		}
+		forcedRollback := errors.New("forced rollback")
+
+		err = manager.WithinTransaction(ctx, tenantID, func(transactionCtx context.Context) error {
+			if err := publisherRepository.Create(transactionCtx, publisher); err != nil {
+				return err
+			}
+			if _, created, err := idempotencyRepository.Acquire(transactionCtx, record); err != nil || !created {
+				return fmt.Errorf("acquire idempotency record: created=%t: %w", created, err)
+			}
+			sequence, err := outboxRepository.NextSequence(transactionCtx, tenantID)
+			if err != nil {
+				return err
+			}
+			if err := outboxRepository.Record(transactionCtx, message(rollbackMessageID, sequence)); err != nil {
+				return err
+			}
+			return forcedRollback
+		})
+		if !errors.Is(err, forcedRollback) {
+			t.Fatalf("callback error was not preserved: %v", err)
+		}
+		if _, err := publisherRepository.Get(ctx, tenantID, publisherID); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("publisher survived rollback: %v", err)
+		}
+		if _, err := idempotencyRepository.Get(ctx, tenantID, record.Principal(), action, record.Key()); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("idempotency record survived rollback: %v", err)
+		}
+		if events, err := auditRepository.List(ctx, tenantID, nil, 20); err != nil || len(events) != 0 {
+			t.Fatalf("audit survived rollback: %#v %v", events, err)
+		}
+		if _, err := outboxRepository.Get(ctx, tenantID, rollbackMessageID); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("outbox message survived rollback: %v", err)
+		}
+
+		committedPublisherID := parse("0198fc21-ced5-7000-8000-000000000006")
+		committedRecordID := parse("0198fc21-ced5-7000-8000-000000000007")
+		committedPublisher, _ := domainpublisher.New(tenantID, committedPublisherID, "atomic-commit", "", "", now)
+		committedRecord, _ := domainidempotency.New(tenantID, committedRecordID, "integration:test-principal", action, "commit-key", digest, now, now.Add(24*time.Hour))
+		committedMessageID := parse("0198fc21-ced5-7000-8000-00000000000a")
+		err = manager.WithinTransaction(ctx, tenantID, func(transactionCtx context.Context) error {
+			if err := publisherRepository.Create(transactionCtx, committedPublisher); err != nil {
+				return err
+			}
+			if err := manager.WithinTransaction(transactionCtx, tenantID, func(nestedCtx context.Context) error {
+				_, created, err := idempotencyRepository.Acquire(nestedCtx, committedRecord)
+				if err == nil && !created {
+					return errors.New("nested transaction did not create idempotency record")
+				}
+				return err
+			}); err != nil {
+				return err
+			}
+			if err := manager.WithinTransaction(transactionCtx, otherTenantID, func(context.Context) error { return nil }); typedClass(err) != shared.ErrorInvalid {
+				return fmt.Errorf("cross-tenant nested transaction class = %q: %w", typedClass(err), err)
+			}
+			sequence, err := outboxRepository.NextSequence(transactionCtx, tenantID)
+			if err != nil {
+				return err
+			}
+			if sequence != 1 {
+				return fmt.Errorf("rolled-back event sequence was retained: %d", sequence)
+			}
+			return outboxRepository.Record(transactionCtx, message(committedMessageID, sequence))
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := publisherRepository.Get(ctx, tenantID, committedPublisherID); err != nil {
+			t.Fatalf("committed publisher missing: %v", err)
+		}
+		if got, err := idempotencyRepository.Get(ctx, tenantID, committedRecord.Principal(), action, committedRecord.Key()); err != nil || got.ID() != committedRecordID {
+			t.Fatalf("committed idempotency record: %#v %v", got, err)
+		}
+		if events, err := auditRepository.List(ctx, tenantID, nil, 20); err != nil || len(events) != 1 {
+			t.Fatalf("committed audit events: %#v %v", events, err)
+		}
+		if got, err := outboxRepository.Get(ctx, tenantID, committedMessageID); err != nil || got.Sequence() != 1 {
+			t.Fatalf("committed outbox message: %#v %v", got, err)
 		}
 	})
 	t.Run("publisher_repository", func(t *testing.T) {

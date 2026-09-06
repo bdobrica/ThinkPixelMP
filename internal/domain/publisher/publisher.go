@@ -56,7 +56,8 @@ type StateRecord struct {
 }
 
 // Repository is the tenant-scoped persistence boundary for publishers.
-// Implementations must apply TenantID to both database context and predicates.
+// Implementations must apply TenantID to both database context and predicates,
+// and join a transaction carried by the supplied context when supported.
 type Repository interface {
 	Create(context.Context, Publisher) error
 	Get(context.Context, shared.UUID, shared.UUID) (Publisher, error)

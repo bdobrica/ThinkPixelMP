@@ -35,6 +35,8 @@ type ArtifactSource struct {
 }
 
 // Repository is the tenant-scoped persistence boundary for ArtifactSource values.
+// Repository is the tenant-scoped persistence boundary for artifact sources.
+// Its operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, ArtifactSource) error
 	Get(context.Context, shared.UUID, shared.UUID) (ArtifactSource, error)

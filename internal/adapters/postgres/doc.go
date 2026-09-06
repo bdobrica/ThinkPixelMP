@@ -1,2 +1,3 @@
-// Package postgres will persist authoritative marketplace state in PostgreSQL.
+// Package postgres persists authoritative marketplace state and composes
+// tenant-scoped repository work in PostgreSQL transactions.
 package postgres

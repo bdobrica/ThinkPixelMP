@@ -43,6 +43,8 @@ type ArtifactDependency struct {
 	normalizedValue   []byte
 }
 
+// Repository is the tenant-scoped persistence boundary for dependencies. Its
+// operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, ArtifactDependency) error
 	Get(context.Context, shared.UUID, shared.UUID, uint16) (ArtifactDependency, error)

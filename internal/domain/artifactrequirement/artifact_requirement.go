@@ -32,6 +32,8 @@ type ArtifactRequirement struct {
 	normalizedRequirement []byte
 }
 
+// Repository is the tenant-scoped persistence boundary for requirements. Its
+// operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, ArtifactRequirement) error
 	Get(context.Context, shared.UUID, shared.UUID) (ArtifactRequirement, error)

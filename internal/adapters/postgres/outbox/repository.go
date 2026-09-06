@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	postgres "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/outbox"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/jackc/pgx/v5"
@@ -24,6 +25,25 @@ func NewRepository(db beginner) (*Repository, error) {
 		return nil, fmt.Errorf("outbox repository: database is required")
 	}
 	return &Repository{db: db}, nil
+}
+
+// NextSequence allocates a tenant-local sequence in the application transaction
+// carried by ctx.
+func (repository *Repository) NextSequence(ctx context.Context, tenantID shared.UUID) (uint64, error) {
+	tx, err := postgres.CurrentTransaction(ctx, tenantID)
+	if err != nil {
+		return 0, err
+	}
+	return NextSequence(ctx, tx, tenantID)
+}
+
+// Record appends a message in the application transaction carried by ctx.
+func (repository *Repository) Record(ctx context.Context, value domain.Message) error {
+	tx, err := postgres.CurrentTransaction(ctx, value.TenantID())
+	if err != nil {
+		return err
+	}
+	return Record(ctx, tx, value)
 }
 
 // NextSequence allocates a tenant-local event sequence through the caller's
@@ -264,15 +284,7 @@ func (repository *Repository) begin(ctx context.Context, tenantID shared.UUID) (
 	if !validUUID(tenantID) {
 		return nil, typed(shared.ErrorInvalid, "outbox.invalid_tenant")
 	}
-	tx, err := repository.db.Begin(ctx)
-	if err != nil {
-		return nil, unavailable()
-	}
-	if _, err := tx.Exec(ctx, `SELECT set_config('thinkpixelmp.tenant_id', $1, true)`, tenantID.String()); err != nil {
-		rollback(tx)
-		return nil, unavailable()
-	}
-	return tx, nil
+	return postgres.BeginRepositoryTransaction(ctx, repository.db, tenantID)
 }
 
 func rollback(tx pgx.Tx)            { _ = tx.Rollback(context.Background()) }
@@ -284,3 +296,4 @@ func typed(class shared.ErrorClass, code string) error {
 func unavailable() error { return typed(shared.ErrorUnavailable, "outbox.persistence_unavailable") }
 
 var _ domain.Repository = (*Repository)(nil)
+var _ domain.Writer = (*Repository)(nil)

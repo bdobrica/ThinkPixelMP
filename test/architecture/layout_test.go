@@ -29,7 +29,7 @@ func TestPlannedDirectoriesExist(t *testing.T) {
 		"internal/app/promotion", "internal/app/resolution", "internal/app/federation",
 		"internal/ports/registry", "internal/ports/signature", "internal/ports/provenance",
 		"internal/ports/evidence", "internal/ports/policy", "internal/ports/identity",
-		"internal/ports/key", "internal/ports/importer", "internal/ports/clock",
+		"internal/ports/key", "internal/ports/importer", "internal/ports/clock", "internal/ports/transaction",
 		"internal/adapters/registry/oras", "internal/adapters/signature/sigstore", "internal/adapters/policy/opa",
 		"internal/adapters/import/mcpregistry", "internal/adapters/import/oci",
 		"internal/adapters/import/a2a", "internal/adapters/import/git",
@@ -73,6 +73,7 @@ func TestPlannedGoPackagesAreDiscoverable(t *testing.T) {
 		"internal/ports", "internal/ports/clock", "internal/ports/evidence", "internal/ports/identity",
 		"internal/ports/importer", "internal/ports/key", "internal/ports/policy", "internal/ports/provenance",
 		"internal/ports/registry", "internal/ports/signature", "internal/security", "internal/telemetry",
+		"internal/ports/transaction",
 		"internal/telemetry/logging", "internal/telemetry/metrics", "internal/telemetry/tracing",
 		"test/architecture", "test/contract", "test/e2e", "test/federation", "test/integration", "test/security",
 	}

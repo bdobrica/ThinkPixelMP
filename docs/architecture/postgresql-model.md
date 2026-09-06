@@ -85,8 +85,14 @@ automatic attempt-exhaustion dead-lettering, and 30/90-day delivered/dead-letter
 retention minima support at-least-once delivery without changing or losing the
 logical event. Event construction accepts only the versioned MarketplaceEvent v1
 families and allowlisted payload fields. The sink worker, SSE surface, retention
-job, coupling to later event-producing mutations, and general transaction manager
-remain later work.
+job, and coupling to later event-producing mutations remain later work. DB-014
+adds a vendor-neutral transaction-manager port and a PostgreSQL implementation.
+Repository calls made with its callback context join the same tenant-bound
+transaction through savepoints; standalone calls preserve their existing
+transaction ownership. Callback errors roll back all composed work, nested
+composition cannot change tenant scope, and no pgx transaction type crosses into
+application contracts. The OutboxMessage writer requires this transaction context
+so sequence allocation and immutable event insertion cannot commit separately.
 See
 [migration files](../../migrations/README.md) and [database
 operations](../operations/development-database.md). The remaining aggregates,

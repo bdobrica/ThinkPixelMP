@@ -71,6 +71,7 @@ type ArtifactVersion struct {
 }
 
 // Repository is the tenant-scoped persistence boundary for ArtifactVersions.
+// Its operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, ArtifactVersion) error
 	Get(context.Context, shared.UUID, shared.UUID) (ArtifactVersion, error)

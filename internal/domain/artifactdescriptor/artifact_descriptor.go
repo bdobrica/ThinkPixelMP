@@ -29,6 +29,8 @@ type ArtifactDescriptor struct {
 	normalizedMetadata []byte
 }
 
+// Repository is the tenant-scoped persistence boundary for descriptors. Its
+// operations join a transaction carried by context when supported.
 type Repository interface {
 	Create(context.Context, ArtifactDescriptor) error
 	Get(context.Context, shared.UUID, shared.UUID) (ArtifactDescriptor, error)

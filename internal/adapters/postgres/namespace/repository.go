@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	postgres "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres"
 	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/namespace"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
@@ -140,15 +141,7 @@ func (repository *Repository) begin(ctx context.Context, tenantID shared.UUID) (
 	if !validUUID(tenantID) {
 		return nil, typed(shared.ErrorInvalid, "namespace.invalid_tenant")
 	}
-	tx, err := repository.db.Begin(ctx)
-	if err != nil {
-		return nil, unavailable()
-	}
-	if _, err := tx.Exec(ctx, `SELECT set_config('thinkpixelmp.tenant_id', $1, true)`, tenantID.String()); err != nil {
-		rollback(tx)
-		return nil, unavailable()
-	}
-	return tx, nil
+	return postgres.BeginRepositoryTransaction(ctx, repository.db, tenantID)
 }
 
 const namespaceSelect = `SELECT tenant_id::text, namespace_id::text, path,

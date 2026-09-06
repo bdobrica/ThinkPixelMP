@@ -76,6 +76,8 @@ type Record struct {
 	expiresAt   time.Time
 }
 
+// Repository is the tenant-scoped idempotency persistence boundary. Its
+// operations join a transaction carried by context when supported.
 type Repository interface {
 	Acquire(context.Context, Record) (Record, bool, error)
 	Get(context.Context, shared.UUID, string, shared.ReasonCode, string) (Record, error)

@@ -29,6 +29,8 @@ type Namespace struct {
 
 // Repository is the tenant-scoped persistence boundary for namespaces.
 // Implementations must apply TenantID to both database context and predicates.
+// Repository is the tenant-scoped persistence boundary for namespaces. Its
+// operations join a transaction carried by context when the adapter supports it.
 type Repository interface {
 	Create(context.Context, Namespace) error
 	Get(context.Context, shared.UUID, shared.UUID) (Namespace, error)

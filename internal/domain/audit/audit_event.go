@@ -87,6 +87,8 @@ type Event struct {
 	traceID        string
 }
 
+// Repository is the tenant-scoped read boundary for audit facts. Its operations
+// join a transaction carried by context when supported.
 type Repository interface {
 	Get(context.Context, shared.UUID, shared.UUID) (Event, error)
 	List(context.Context, shared.UUID, *shared.UUID, int) ([]Event, error)

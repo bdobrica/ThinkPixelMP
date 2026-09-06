@@ -63,7 +63,9 @@ type Repository interface {
 	Get(context.Context, shared.UUID, shared.UUID) (Publisher, error)
 	GetBySlug(context.Context, shared.UUID, string) (Publisher, error)
 	List(context.Context, shared.UUID, *shared.UUID, int) ([]Publisher, error)
-	ChangeState(context.Context, shared.UUID, shared.UUID, State, shared.ReasonCode, string, time.Time) (Publisher, error)
+	// ChangeState applies a transition only when expectedVersion equals the
+	// aggregate's current StateVersion.
+	ChangeState(context.Context, shared.UUID, shared.UUID, int64, State, shared.ReasonCode, string, time.Time) (Publisher, error)
 }
 
 func New(tenantID, id shared.UUID, slug, displayName, description string, createdAt time.Time) (Publisher, error) {

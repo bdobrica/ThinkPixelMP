@@ -141,16 +141,19 @@ func (repository *Repository) List(ctx context.Context, tenantID shared.UUID, af
 	return values, nil
 }
 
-func (repository *Repository) ChangeState(ctx context.Context, tenantID, publisherID shared.UUID, state domain.State, reason shared.ReasonCode, explanation string, at time.Time) (domain.Publisher, error) {
+func (repository *Repository) ChangeState(ctx context.Context, tenantID, publisherID shared.UUID, expectedVersion int64, state domain.State, reason shared.ReasonCode, explanation string, at time.Time) (domain.Publisher, error) {
 	if !validUUID(publisherID) {
 		return domain.Publisher{}, typed(shared.ErrorInvalid, "publisher.invalid_id")
+	}
+	if expectedVersion < 1 {
+		return domain.Publisher{}, typed(shared.ErrorInvalid, "publisher.invalid_state_version")
 	}
 	tx, err := repository.begin(ctx, tenantID)
 	if err != nil {
 		return domain.Publisher{}, err
 	}
 	defer rollback(tx)
-	row := tx.QueryRow(ctx, publisherSelect+` WHERE p.tenant_id = $1::uuid AND p.publisher_id = $2::uuid FOR UPDATE OF p`,
+	row := tx.QueryRow(ctx, publisherSelect+` WHERE p.tenant_id = $1::uuid AND p.publisher_id = $2::uuid`,
 		tenantID.String(), publisherID.String())
 	current, err := scan(row)
 	if errors.Is(err, pgx.ErrNoRows) {
@@ -158,6 +161,9 @@ func (repository *Repository) ChangeState(ctx context.Context, tenantID, publish
 	}
 	if err != nil {
 		return domain.Publisher{}, unavailable()
+	}
+	if current.StateVersion() != expectedVersion {
+		return domain.Publisher{}, typed(shared.ErrorConflict, "publisher.stale_state_version")
 	}
 	next, record, err := current.Transition(state, reason, explanation, at)
 	if errors.Is(err, domain.ErrInvalidTransition) {
@@ -171,10 +177,18 @@ func (repository *Repository) ChangeState(ctx context.Context, tenantID, publish
  VALUES ($1::uuid, $2::uuid, $3, $4, $5, NULLIF($6, ''), $7)`, tenantID.String(), publisherID.String(),
 		record.Version, string(record.State), record.Reason.String(), record.Explanation, record.RecordedAt)
 	if err == nil {
-		_, err = tx.Exec(ctx, `UPDATE public.publishers SET current_state_version = $3
- WHERE tenant_id = $1::uuid AND publisher_id = $2::uuid`, tenantID.String(), publisherID.String(), record.Version)
+		var result pgconn.CommandTag
+		result, err = tx.Exec(ctx, `UPDATE public.publishers SET current_state_version = $3
+ WHERE tenant_id = $1::uuid AND publisher_id = $2::uuid AND current_state_version = $4`,
+			tenantID.String(), publisherID.String(), record.Version, expectedVersion)
+		if err == nil && result.RowsAffected() != 1 {
+			return domain.Publisher{}, typed(shared.ErrorConflict, "publisher.stale_state_version")
+		}
 	}
 	if err != nil {
+		if uniqueViolation(err) {
+			return domain.Publisher{}, typed(shared.ErrorConflict, "publisher.stale_state_version")
+		}
 		return domain.Publisher{}, unavailable()
 	}
 	decision, _ := shared.NewReasonCode(string(state))

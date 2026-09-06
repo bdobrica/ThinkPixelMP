@@ -67,8 +67,7 @@ tenant-scoped AuditEvent facts with minimized actor, action, opaque resource,
 digest/reference, decision/reason, and request/trace correlation fields. Existing
 authoritative mutation repositories write their audit fact in the mutation
 transaction, while deferred database triggers reject commits without the matching
-fact. Outbox sink delivery remains later application work; the general transaction
-manager and optimistic concurrency remain sequenced as DB-014 and DB-015. DB-012
+fact. Outbox sink delivery remains later application work. DB-012
 implements tenant-scoped IdempotencyRecord ownership using the contract tuple of
 tenant, principal, action, and key. Each tuple binds one canonical request digest,
 can establish one bounded HTTP status and optional opaque resource identity, and
@@ -93,6 +92,18 @@ transaction ownership. Callback errors roll back all composed work, nested
 composition cannot change tenant scope, and no pgx transaction type crosses into
 application contracts. The OutboxMessage writer requires this transaction context
 so sequence allocation and immutable event insertion cannot commit separately.
+DB-015 makes the Publisher state version an explicit repository precondition,
+which is the mutable administrative aggregate implemented so far. State changes
+compare the caller's expected version with the loaded aggregate and conditionally
+advance `current_state_version`; a competing or stale change fails with the stable
+`publisher.stale_state_version` code and cannot append history, audit a mutation,
+or overwrite the winner. The application HTTP boundary will translate this
+stable conflict into the contract's strong ETag and `412 Precondition Failed`
+behavior when publisher administration is implemented. Immutable creates,
+append-only actions, and mutable delivery/idempotency machinery are deliberately
+outside this administrative optimistic-concurrency rule. Later mutable
+administrative aggregates must expose and condition updates on their own
+monotonic version when they are implemented.
 See
 [migration files](../../migrations/README.md) and [database
 operations](../operations/development-database.md). The remaining aggregates,

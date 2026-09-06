@@ -377,12 +377,65 @@ func TestPostgres(t *testing.T) {
 			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
 		}
 		reason, _ := shared.NewReasonCode("ownership.confirmed")
-		got, err = repository.ChangeState(ctx, a, publisherAID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute))
+		got, err = repository.ChangeState(ctx, a, publisherAID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute))
 		if err != nil || got.State() != domainpublisher.StateVerified || got.StateVersion() != 2 {
 			t.Fatalf("change state: %#v %v", got, err)
 		}
-		if _, err := repository.ChangeState(ctx, a, publisherAID, domainpublisher.StateClaimed, reason, "invalid", now.Add(2*time.Minute)); typedClass(err) != shared.ErrorConflict {
+		if _, err := repository.ChangeState(ctx, a, publisherAID, 1, domainpublisher.StateSuspended, reason, "stale", now.Add(2*time.Minute)); typedCode(err) != "publisher.stale_state_version" {
+			t.Fatalf("stale version code = %q: %v", typedCode(err), err)
+		}
+		if _, err := repository.ChangeState(ctx, a, publisherAID, 0, domainpublisher.StateSuspended, reason, "invalid", now.Add(2*time.Minute)); typedClass(err) != shared.ErrorInvalid {
+			t.Fatalf("invalid version class = %q: %v", typedClass(err), err)
+		}
+		if _, err := repository.ChangeState(ctx, a, publisherAID, 2, domainpublisher.StateClaimed, reason, "invalid", now.Add(2*time.Minute)); typedClass(err) != shared.ErrorConflict {
 			t.Fatalf("invalid transition class = %q: %v", typedClass(err), err)
+		}
+
+		concurrentID := parse("0198fc21-ced5-7000-8000-000000000024")
+		concurrentPublisher, _ := domainpublisher.New(a, concurrentID, "concurrent", "Concurrent", "", now)
+		if err := repository.Create(ctx, concurrentPublisher); err != nil {
+			t.Fatal(err)
+		}
+		peer, err := connect("publisher_test")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer func() { _ = peer.Close(context.Background()) }()
+		if _, err := peer.Exec(ctx, "SET ROLE db002_service"); err != nil {
+			t.Fatal(err)
+		}
+		peerRepository, err := postgrespublisher.NewRepository(peer)
+		if err != nil {
+			t.Fatal(err)
+		}
+		results := make(chan error, 2)
+		var transitions sync.WaitGroup
+		transitions.Go(func() {
+			_, transitionErr := repository.ChangeState(ctx, a, concurrentID, 1, domainpublisher.StateVerified, reason, "verified", now.Add(3*time.Minute))
+			results <- transitionErr
+		})
+		transitions.Go(func() {
+			_, transitionErr := peerRepository.ChangeState(ctx, a, concurrentID, 1, domainpublisher.StateSuspended, reason, "suspended", now.Add(3*time.Minute))
+			results <- transitionErr
+		})
+		transitions.Wait()
+		close(results)
+		var successful, stale int
+		for transitionErr := range results {
+			switch typedCode(transitionErr) {
+			case "":
+				successful++
+			case "publisher.stale_state_version":
+				stale++
+			default:
+				t.Fatalf("unexpected concurrent transition: %v", transitionErr)
+			}
+		}
+		if successful != 1 || stale != 1 {
+			t.Fatalf("concurrent outcomes: successful=%d stale=%d", successful, stale)
+		}
+		if current, err := repository.Get(ctx, a, concurrentID); err != nil || current.StateVersion() != 2 {
+			t.Fatalf("concurrent publisher: %#v %v", current, err)
 		}
 		unauditedID := parse("0198fc21-ced5-7000-8000-000000000022")
 		unaudited, _ := domainpublisher.New(a, unauditedID, "no-actor", "No actor", "", now)
@@ -397,7 +450,7 @@ func TestPostgres(t *testing.T) {
 			t.Fatal(err)
 		}
 		auditEvents, err := auditRepository.List(ctx, a, nil, 20)
-		if err != nil || len(auditEvents) != 2 {
+		if err != nil || len(auditEvents) != 4 {
 			t.Fatalf("publisher audits: %#v %v", auditEvents, err)
 		}
 		decision, hasDecision := auditEvents[1].Decision()
@@ -501,10 +554,10 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		reason, _ := shared.NewReasonCode("ownership.confirmed")
-		if _, err := publisherRepository.ChangeState(ctx, a, publisherAID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, a, publisherAID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := publisherRepository.ChangeState(ctx, b, publisherBID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, b, publisherBID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
 
@@ -600,10 +653,10 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		reason, _ := shared.NewReasonCode("ownership.confirmed")
-		if _, err := publisherRepository.ChangeState(ctx, tenantA, publisherAID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, tenantA, publisherAID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := publisherRepository.ChangeState(ctx, tenantB, publisherBID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, tenantB, publisherBID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
 		namespaceRepository, _ := postgresnamespace.NewRepository(conn)
@@ -726,10 +779,10 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		reason, _ := shared.NewReasonCode("ownership.confirmed")
-		if _, err := publisherRepository.ChangeState(ctx, tenantA, publisherAID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, tenantA, publisherAID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := publisherRepository.ChangeState(ctx, tenantB, publisherBID, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+		if _, err := publisherRepository.ChangeState(ctx, tenantB, publisherBID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
 			t.Fatal(err)
 		}
 		namespaceRepository, _ := postgresnamespace.NewRepository(conn)
@@ -1418,6 +1471,14 @@ func typedClass(err error) shared.ErrorClass {
 	var typed *shared.TypedError
 	if errors.As(err, &typed) {
 		return typed.Class()
+	}
+	return ""
+}
+
+func typedCode(err error) string {
+	var typed *shared.TypedError
+	if errors.As(err, &typed) {
+		return typed.Code().String()
 	}
 	return ""
 }

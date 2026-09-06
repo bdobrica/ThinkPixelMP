@@ -54,6 +54,24 @@ func TestMessageRejectsMismatchedOrUnboundedValues(t *testing.T) {
 	}
 }
 
+func TestMessageAcceptsBoundedNamespaceDelegationEvents(t *testing.T) {
+	tenant := mustUUID(t, "0198fc21-ced5-7000-8000-000000000001")
+	id := mustUUID(t, "0198fc21-ced5-7000-8000-000000000002")
+	namespaceID := mustUUID(t, "0198fc21-ced5-7000-8000-000000000003")
+	publisherID := mustUUID(t, "0198fc21-ced5-7000-8000-000000000004")
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	for eventType, state := range map[string]string{
+		"io.thinkpixel.mp.namespace.delegated.v1":          `"current_state":"active"`,
+		"io.thinkpixel.mp.namespace.delegation-revoked.v1": `"previous_state":"active","current_state":"revoked","reason_code":"ownership.changed"`,
+	} {
+		payload := []byte(fmt.Sprintf(`{"specversion":"1.0","id":"%s","source":"urn:thinkpixel:mp:test","type":"%s","subject":"%s","time":"%s","datacontenttype":"%s","sequence":1,"data":{"tenant_id":"%s","transaction_cursor":"1","namespace_id":"%s","delegation_id":"%s","publisher_id":"%s",%s}}`,
+			id.String(), eventType, id.String(), now.Format(time.RFC3339Nano), DataContentType, tenant.String(), namespaceID.String(), id.String(), publisherID.String(), state))
+		if _, err := New(tenant, id, 1, "urn:thinkpixel:mp:test", eventType, id.String(), payload, now); err != nil {
+			t.Fatalf("%s: %v", eventType, err)
+		}
+	}
+}
+
 func eventPayload(tenant, id shared.UUID, sequence uint64, at time.Time) []byte {
 	return []byte(fmt.Sprintf(`{"specversion":"1.0","id":"%s","source":"urn:thinkpixel:mp:test","type":"io.thinkpixel.mp.artifact.registered.v1","subject":"%s","time":"%s","datacontenttype":"%s","sequence":%d,"data":{"tenant_id":"%s","transaction_cursor":"cursor-%d","artifact_version_id":"%s","artifact_digest":"sha256:%s","descriptor_digest":"sha256:%s"}}`,
 		id.String(), id.String(), at.Format(time.RFC3339Nano), DataContentType, sequence, tenant.String(), sequence,

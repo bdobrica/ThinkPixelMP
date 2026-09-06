@@ -33,8 +33,10 @@ runner. DB-002 implements the Publisher aggregate with tenant-local slug
 uniqueness, append-only state records, and repository-enforced transaction-local
 tenant scope. DB-003 implements immutable Namespace ownership roots with canonical
 tenant-local path uniqueness, verified tenant-consistent Publisher ownership, and
-the same repository/RLS scoping. Namespace delegation and longest-prefix
-publication authorization remain sequenced as PUB-003. DB-004 implements the
+the same repository/RLS scoping. PUB-003 adds immutable delegation identity,
+append-only active/revoked history, verified tenant-local recipients, and live
+longest-prefix publication ownership resolution that fails closed for an
+inactive controlling Publisher. DB-004 implements the
 logical Artifact root with tenant-consistent Namespace membership, canonical
 tenant-local identity uniqueness, a fixed V1 kind, bounded discovery metadata,
 and repository/RLS scoping. DB-005 implements the ArtifactVersion identity

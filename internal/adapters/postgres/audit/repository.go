@@ -17,6 +17,8 @@ const (
 	ActionPublisherCreated           = "publisher.created"
 	ActionPublisherStateChanged      = "publisher.state_changed"
 	ActionNamespaceCreated           = "namespace.created"
+	ActionNamespaceDelegated         = "namespace.delegated"
+	ActionNamespaceDelegationRevoked = "namespace.delegation_revoked"
 	ActionArtifactCreated            = "artifact.created"
 	ActionArtifactVersionRegistered  = "artifact_version.registered"
 	ActionArtifactSourceCreated      = "artifact_source.created"

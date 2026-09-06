@@ -180,6 +180,16 @@ type dataSpec struct {
 }
 
 var eventDataSpecs = map[string]dataSpec{
+	"io.thinkpixel.mp.namespace.delegated.v1": {
+		required: []string{"tenant_id", "transaction_cursor", "namespace_id", "delegation_id", "publisher_id", "current_state"},
+		uuids:    []string{"tenant_id", "namespace_id", "delegation_id", "publisher_id"},
+		enums:    map[string][]string{"current_state": {"active"}},
+	},
+	"io.thinkpixel.mp.namespace.delegation-revoked.v1": {
+		required: []string{"tenant_id", "transaction_cursor", "namespace_id", "delegation_id", "publisher_id", "previous_state", "current_state", "reason_code"},
+		uuids:    []string{"tenant_id", "namespace_id", "delegation_id", "publisher_id"}, reasons: []string{"reason_code"},
+		enums: map[string][]string{"previous_state": {"active"}, "current_state": {"revoked"}},
+	},
 	"io.thinkpixel.mp.artifact.registered.v1": {
 		required: []string{"tenant_id", "transaction_cursor", "artifact_version_id", "artifact_digest", "descriptor_digest"},
 		uuids:    []string{"tenant_id", "artifact_version_id"}, digests: []string{"artifact_digest", "descriptor_digest"},

@@ -17,6 +17,7 @@
     "data": {"type": "object"}
   },
   "oneOf": [
+    {"$ref": "#/$defs/namespaceDelegation"},
     {"$ref": "#/$defs/artifactRegistered"},
     {"$ref": "#/$defs/artifactLifecycle"},
     {"$ref": "#/$defs/evidenceAccepted"},
@@ -27,6 +28,29 @@
     {"$ref": "#/$defs/importFinished"}
   ],
   "$defs": {
+    "namespaceDelegation": {
+      "properties": {
+        "type": {"enum": ["io.thinkpixel.mp.namespace.delegated.v1", "io.thinkpixel.mp.namespace.delegation-revoked.v1"]},
+        "data": {
+          "type": "object", "additionalProperties": false,
+          "required": ["tenant_id", "transaction_cursor", "namespace_id", "delegation_id", "publisher_id", "current_state"],
+          "properties": {
+            "tenant_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "transaction_cursor": {"type": "string", "minLength": 1, "maxLength": 1024},
+            "namespace_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "delegation_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "publisher_id": {"$ref": "common-v1.schema.json#/$defs/uuidV7"},
+            "previous_state": {"const": "active"},
+            "current_state": {"type": "string", "enum": ["active", "revoked"]},
+            "reason_code": {"type": "string", "minLength": 1, "maxLength": 128}
+          }
+        }
+      },
+      "oneOf": [
+        {"properties": {"type": {"const": "io.thinkpixel.mp.namespace.delegated.v1"}, "data": {"properties": {"current_state": {"const": "active"}}, "not": {"anyOf": [{"required": ["previous_state"]}, {"required": ["reason_code"]}]}}}},
+        {"properties": {"type": {"const": "io.thinkpixel.mp.namespace.delegation-revoked.v1"}, "data": {"required": ["previous_state", "reason_code"], "properties": {"current_state": {"const": "revoked"}}}}}
+      ]
+    },
     "artifactRegistered": {
       "properties": {
         "type": {"const": "io.thinkpixel.mp.artifact.registered.v1"},

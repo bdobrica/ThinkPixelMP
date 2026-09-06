@@ -106,7 +106,7 @@ func TestPostgres(t *testing.T) {
 	t.Run("empty_repeat_and_RLS", func(t *testing.T) {
 		conn := newDB(t, "tenant_test")
 		states, err := Run(ctx, conn, migrations.Files, false)
-		if err != nil || len(states) != 13 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied || states[12].Applied {
+		if err != nil || len(states) != 14 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied || states[12].Applied || states[13].Applied {
 			t.Fatalf("empty status: %v %v", states, err)
 		}
 		var exists bool
@@ -120,7 +120,7 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		states, err = Run(ctx, conn, migrations.Files, false)
-		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied || !states[12].Applied {
+		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied || !states[12].Applied || !states[13].Applied {
 			t.Fatalf("applied status: %v %v", states, err)
 		}
 		execSQL := func(sql string) {
@@ -524,6 +524,8 @@ func TestPostgres(t *testing.T) {
 		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db003_service")
 		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db003_service")
 		execSQL("GRANT SELECT, INSERT ON public.namespaces TO db003_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.namespace_delegations TO db003_service")
+		execSQL("GRANT SELECT, INSERT ON public.namespace_delegation_state_records TO db003_service")
 		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db003_service")
 		execSQL("SET ROLE db003_service")
 
@@ -595,6 +597,66 @@ func TestPostgres(t *testing.T) {
 		}
 		if _, err := repository.Get(ctx, a, namespaceBID); typedClass(err) != shared.ErrorNotFound {
 			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
+		}
+
+		delegationID := parse("0198fc21-ced5-7000-8000-000000000055")
+		invalidDelegation, _ := domainnamespace.NewDelegation(a, delegationID, namespaceAID, namespaceA.Path(), claimedPublisherID, "acme/security/tools", now.Add(3*time.Minute))
+		if err := repository.CreateDelegation(ctx, invalidDelegation); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("unverified delegate class = %q: %v", typedClass(err), err)
+		}
+		if _, err := publisherRepository.ChangeState(ctx, a, claimedPublisherID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(3*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if err := repository.CreateDelegation(ctx, invalidDelegation); err != nil {
+			t.Fatal(err)
+		}
+		sibling, _ := domainnamespace.NewDelegation(a, parse("0198fc21-ced5-7000-8000-000000000058"), namespaceAID, namespaceA.Path(), claimedPublisherID, "acme/security/finance", now.Add(3*time.Minute))
+		if err := repository.CreateDelegation(ctx, sibling); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("ambiguous sibling delegation class = %q: %v", typedClass(err), err)
+		}
+		nested, _ := domainnamespace.NewDelegation(a, parse("0198fc21-ced5-7000-8000-000000000059"), namespaceAID, namespaceA.Path(), publisherAID, "acme/security/tools/reviews", now.Add(3*time.Minute))
+		if err := repository.CreateDelegation(ctx, nested); err != nil {
+			t.Fatalf("strictly nested delegation: %v", err)
+		}
+		if owner, err := repository.ResolveOwner(ctx, a, "acme/security/tools/reviews/check"); err != nil || owner != publisherAID {
+			t.Fatalf("nested longest-prefix resolution: %s %v", owner, err)
+		}
+		if owner, err := repository.ResolveOwner(ctx, a, "acme/security/other"); err != nil || owner != publisherAID {
+			t.Fatalf("root owner resolution: %s %v", owner, err)
+		}
+		if owner, err := repository.ResolveOwner(ctx, a, "acme/security/tools/reviewer"); err != nil || owner != claimedPublisherID {
+			t.Fatalf("delegated longest-prefix resolution: %s %v", owner, err)
+		}
+		if _, err := publisherRepository.ChangeState(ctx, a, claimedPublisherID, 2, domainpublisher.StateSuspended, reason, "paused", now.Add(4*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := repository.ResolveOwner(ctx, a, "acme/security/tools/reviewer"); typedClass(err) != shared.ErrorForbidden {
+			t.Fatalf("inactive controlling Publisher did not fail closed: %v", err)
+		}
+		if _, err := publisherRepository.ChangeState(ctx, a, claimedPublisherID, 3, domainpublisher.StateVerified, reason, "restored", now.Add(5*time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		collision, _ := domainnamespace.New(a, parse("0198fc21-ced5-7000-8000-000000000056"), "acme/security/tools", publisherAID, now.Add(4*time.Minute))
+		if err := repository.Create(ctx, collision); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("namespace/delegation collision class = %q: %v", typedClass(err), err)
+		}
+		revokeReason, _ := shared.NewReasonCode("ownership.changed")
+		revoked, err := repository.RevokeDelegation(ctx, a, delegationID, 1, revokeReason, "team changed", now.Add(6*time.Minute))
+		if err != nil || revoked.State() != domainnamespace.DelegationRevoked || revoked.StateVersion() != 2 {
+			t.Fatalf("delegation revocation: %#v %v", revoked, err)
+		}
+		if _, err := repository.RevokeDelegation(ctx, a, delegationID, 1, revokeReason, "stale", now.Add(7*time.Minute)); typedCode(err) != "namespace.stale_delegation_version" {
+			t.Fatalf("stale delegation version code = %q: %v", typedCode(err), err)
+		}
+		if owner, err := repository.ResolveOwner(ctx, a, "acme/security/tools/reviewer"); err != nil || owner != publisherAID {
+			t.Fatalf("revoked delegation did not fall back to root: %s %v", owner, err)
+		}
+		if _, err := repository.GetDelegation(ctx, b, delegationID); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant delegation get class = %q: %v", typedClass(err), err)
+		}
+		reassignment, _ := domainnamespace.NewDelegation(a, parse("0198fc21-ced5-7000-8000-000000000057"), namespaceAID, namespaceA.Path(), claimedPublisherID, "acme/security/tools", now.Add(8*time.Minute))
+		if err := repository.CreateDelegation(ctx, reassignment); err != nil {
+			t.Fatalf("append-only reassignment: %v", err)
 		}
 
 		execSQL("RESET ROLE")
@@ -1375,7 +1437,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			if i == 0 {
 				want = "pending"
 			}
-			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want + "\n000012_idempotency_records.sql " + want + "\n000013_outbox_messages.sql " + want
+			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want + "\n000012_idempotency_records.sql " + want + "\n000013_outbox_messages.sql " + want + "\n000014_namespace_delegations.sql " + want
 			if err != nil || strings.TrimSpace(string(out)) != expected {
 				t.Fatalf("command %s: %s %v", action, out, err)
 			}
@@ -1434,7 +1496,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		}
 		wg.Wait()
 		var n int
-		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 13 {
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 14 {
 			t.Fatalf("concurrent ledger: %d %v", n, err)
 		}
 	})

@@ -68,6 +68,10 @@ on `tenants`, `SELECT, INSERT, UPDATE` on `publishers`, and `SELECT, INSERT` on
 records. The Namespace repository additionally needs `SELECT, INSERT` on
 `namespaces` and the Publisher read permissions used by its verified-owner
 database guard. It does not update or delete immutable namespace ownership roots.
+Delegation operations additionally require `SELECT, INSERT, UPDATE` on
+`namespace_delegations` and `SELECT, INSERT` on
+`namespace_delegation_state_records`; updates are constrained to the single
+active-to-revoked transition, and state records remain append-only.
 The Artifact repository additionally needs `SELECT, INSERT` on `artifacts` and
 `SELECT` on `namespaces`; it does not update or delete logical identity records.
 The ArtifactVersion repository additionally needs `SELECT, INSERT` on
@@ -131,7 +135,12 @@ reuse, cross-tenant read denial, duplicate conflict mapping, and append-only sta
 history. Namespace coverage includes create/read/list, canonical path validation,
 same-path reuse across tenants, duplicate rejection within a tenant, verified and
 tenant-consistent owner enforcement, cross-tenant read denial, and immutable
-ownership attribution. Artifact coverage includes create/read/list, canonical
+ownership attribution.
+Delegation coverage includes strict-child and verified-recipient enforcement,
+active-prefix and Namespace-root collision rejection, cross-tenant isolation,
+append-only revocation/reassignment, stale-version rejection, and live
+longest-prefix ownership resolution. Artifact coverage includes create/read/list,
+canonical
 logical identity and fixed-kind enforcement, same-identity reuse across tenants,
 duplicate rejection within a tenant, tenant-consistent Namespace references,
 bounded labels, cross-tenant read denial, and database rejection of identity,

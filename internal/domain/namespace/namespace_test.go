@@ -45,3 +45,28 @@ func TestNamespaceRejectsInvalidPaths(t *testing.T) {
 		}
 	}
 }
+
+func TestDelegationRequiresStrictChildAndHasAppendOnlyRevocation(t *testing.T) {
+	tenant := id(t, "0198fc21-ced5-7000-8000-000000000000")
+	identifier := id(t, "0198fc21-ced5-7000-8000-000000000001")
+	root := id(t, "0198fc21-ced5-7000-8000-000000000002")
+	publisher := id(t, "0198fc21-ced5-7000-8000-000000000003")
+	now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+	for _, prefix := range []string{"acme", "acme-other/tools", "other/tools"} {
+		if _, err := namespace.NewDelegation(tenant, identifier, root, "acme", publisher, prefix, now); err == nil {
+			t.Fatalf("accepted non-child prefix %q", prefix)
+		}
+	}
+	delegation, err := namespace.NewDelegation(tenant, identifier, root, "acme", publisher, "acme/security/tools", now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	reason, _ := shared.NewReasonCode("ownership.changed")
+	revoked, err := delegation.Revoke(reason, "reassigned", now.Add(time.Minute))
+	if err != nil || revoked.State() != namespace.DelegationRevoked || revoked.StateVersion() != 2 {
+		t.Fatalf("revocation: %#v %v", revoked, err)
+	}
+	if _, err := revoked.Revoke(reason, "again", now.Add(2*time.Minute)); err == nil {
+		t.Fatal("revoked a terminal delegation")
+	}
+}

@@ -15,7 +15,12 @@ ThinkPixelMP emits CloudEvents 1.0.2 through a transactional outbox with at-leas
 
 The normative envelope and payload union is [`MarketplaceEvent` v1](../../api/schemas/marketplace-event-v1.schema.json). Payloads contain only tenant-safe IDs, exact digests, state transitions, bounded reason codes, and a transaction cursor. Complete descriptors, raw evidence, proprietary metadata, credentials, and free-form operator explanations are prohibited.
 
-Initial event families include artifact registration/deprecation/quarantine/revocation, evidence acceptance, policy activation, promotion decision, catalog-entry state, immutable resolution, and import result.
+Initial event families include namespace delegation/revocation, artifact
+registration/deprecation/quarantine/revocation, evidence acceptance, policy
+activation, promotion decision, catalog-entry state, immutable resolution, and
+import result. Namespace delegation events carry only tenant-safe Namespace,
+delegation, and Publisher IDs plus state and bounded revocation reason code; the
+potentially proprietary namespace path and free-form explanation are excluded.
 
 Consumers deduplicate by event ID. Redelivery preserves the same logical event and payload digest.
 

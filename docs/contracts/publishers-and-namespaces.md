@@ -67,3 +67,9 @@ Within one tenant:
 Sibling or otherwise ambiguous overlapping delegations are invalid. Collision and ambiguity attempts fail closed.
 
 Only verified Publishers may own newly created namespaces or receive new delegations. A delegation must name a strict descendant prefix and cannot delegate the owned root itself. Delegations are append-only `active` or `revoked`; revocation is ETag-protected and reassignment creates a new record without changing historical attribution.
+
+Publication checks evaluate the live controlling prefix before accepting a
+write. If that longest active root or delegation belongs to a Publisher that is
+not currently `verified`, the check fails closed; it does not fall back to a
+shorter parent prefix. Revoking a delegation removes it from subsequent prefix
+resolution, allowing the next valid ancestor ownership rule to control.

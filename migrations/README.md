@@ -134,5 +134,14 @@ dead-letter state without altering or discarding the original event. The worker,
 HTTP event sink, SSE delivery, retention deletion, and general transaction
 manager remain later work.
 
+`000014_namespace_delegations.sql` creates tenant-scoped Namespace delegation
+records with immutable identity, append-only active/revoked state history,
+optimistic revocation versions, strict-child and verified-Publisher guards, and
+active-prefix collision protection. Namespace roots and active delegations
+cannot claim the same canonical prefix. Repository resolution selects the live
+longest matching root or delegation and fails closed when its controlling
+Publisher is not verified. Delegation creation and revocation require matching
+same-transaction audit facts; forced RLS protects both relations.
+
 See [database operations](../docs/operations/development-database.md) for command,
 credential, RLS context, and test guidance.

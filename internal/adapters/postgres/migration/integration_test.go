@@ -448,6 +448,9 @@ func TestPostgres(t *testing.T) {
 			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
 		}
 		reason, _ := shared.NewReasonCode("ownership.confirmed")
+		if _, err := repository.ChangeState(ctx, a, publisherBID, 1, domainpublisher.StateVerified, reason, "cross-tenant", now.Add(time.Minute)); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant state change class = %q: %v", typedClass(err), err)
+		}
 		got, err = repository.ChangeState(ctx, a, publisherAID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute))
 		if err != nil || got.State() != domainpublisher.StateVerified || got.StateVersion() != 2 {
 			t.Fatalf("change state: %#v %v", got, err)
@@ -712,6 +715,9 @@ func TestPostgres(t *testing.T) {
 			t.Fatalf("namespace/delegation collision class = %q: %v", typedClass(err), err)
 		}
 		revokeReason, _ := shared.NewReasonCode("ownership.changed")
+		if _, err := repository.RevokeDelegation(ctx, b, delegationID, 1, revokeReason, "cross-tenant", now.Add(6*time.Minute)); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant delegation revocation class = %q: %v", typedClass(err), err)
+		}
 		revoked, err := repository.RevokeDelegation(ctx, a, delegationID, 1, revokeReason, "team changed", now.Add(6*time.Minute))
 		if err != nil || revoked.State() != domainnamespace.DelegationRevoked || revoked.StateVersion() != 2 {
 			t.Fatalf("delegation revocation: %#v %v", revoked, err)
@@ -818,6 +824,10 @@ func TestPostgres(t *testing.T) {
 		wrongNamespace, _ := domainartifact.New(tenantA, parse("0198fc21-ced5-7000-8000-000000000093"), namespaceAID, "acme/other", "tool", domainartifact.KindBundle, "", "", "", "", nil, now)
 		if err := repository.Create(ctx, wrongNamespace); typedClass(err) != shared.ErrorNotFound {
 			t.Fatalf("mismatched namespace class = %q: %v", typedClass(err), err)
+		}
+		crossTenantNamespace, _ := domainartifact.New(tenantA, parse("0198fc21-ced5-7000-8000-000000000094"), namespaceBID, "acme/security", "other-tenant", domainartifact.KindSkill, "", "", "", "", nil, now)
+		if err := repository.Create(ctx, crossTenantNamespace); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant namespace class = %q: %v", typedClass(err), err)
 		}
 		identity, _ := shared.ParseArtifactReference("acme/security/reviewer")
 		got, err := repository.GetByIdentity(ctx, tenantA, identity)
@@ -964,6 +974,10 @@ func TestPostgres(t *testing.T) {
 		if err := repository.Create(ctx, crossTenantPublisher); typedClass(err) != shared.ErrorNotFound {
 			t.Fatalf("cross-tenant publisher class = %q: %v", typedClass(err), err)
 		}
+		crossTenantArtifact, _ := domainartifactversion.New(tenantA, parse("0198fc21-ced5-7000-8000-000000000145"), artifactBID, publisherAID, otherSemantic, parseDigest("c"), domainartifact.KindSkill, domainartifactversion.ClassInstructional, domainartifactversion.DeliveryOCI, now)
+		if err := repository.Create(ctx, crossTenantArtifact); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant artifact class = %q: %v", typedClass(err), err)
+		}
 		got, err := repository.GetBySemanticVersion(ctx, tenantA, artifactAID, semantic)
 		if err != nil || got.ID() != versionAID || got.Digest() != parseDigest("a") || got.Lifecycle() != domainartifactversion.LifecycleActive {
 			t.Fatalf("get by version: %#v %v", got, err)
@@ -1012,6 +1026,10 @@ func TestPostgres(t *testing.T) {
 		}
 		if err := sourceRepository.Create(ctx, sourceB); err != nil {
 			t.Fatal(err)
+		}
+		crossTenantSource, _ := domainartifactsource.NewOCI(tenantA, versionBID, "registry.example/acme/security/reviewer:other-tenant", resolvedB, versionB.Digest())
+		if err := sourceRepository.Create(ctx, crossTenantSource); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant source parent class = %q: %v", typedClass(err), err)
 		}
 		remoteSource, _ := domainartifactsource.NewRemote(tenantA, remoteVersionID, "https://agents.example/card.json", "https://objects.example/cards/immutable", remoteVersion.Digest(), "https://agents.example/a2a")
 		if err := sourceRepository.Create(ctx, remoteSource); err != nil {
@@ -1070,6 +1088,13 @@ func TestPostgres(t *testing.T) {
 		if err := descriptorRepository.Create(ctx, descriptorB); err != nil {
 			t.Fatal(err)
 		}
+		crossTenantDescriptor, err := domainartifactdescriptor.New(tenantA, versionBID, shared.SHA256Digest(metadataB), "application/vnd.thinkpixel.skill.manifest.v1+json", metadataB)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := descriptorRepository.Create(ctx, crossTenantDescriptor); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant descriptor parent class = %q: %v", typedClass(err), err)
+		}
 		emptyRequirementMetadata := []byte(`{"schema_version":1}`)
 		importDescriptorMetadata := []byte(`{"schema_version":1,"kind":"skill","artifact":{"namespace":"acme/security","name":"reviewer","version":"1.2.6"},"requirements":` + string(emptyRequirementMetadata) + `,"dependencies":[],"spec":{}}`)
 		importDescriptor, err := domainartifactdescriptor.New(tenantA, importVersionID, shared.SHA256Digest(importDescriptorMetadata), "application/vnd.thinkpixel.skill.manifest.v1+json", importDescriptorMetadata)
@@ -1116,6 +1141,13 @@ func TestPostgres(t *testing.T) {
 		if err := requirementRepository.Create(ctx, requirementB); err != nil {
 			t.Fatal(err)
 		}
+		crossTenantRequirement, err := domainartifactrequirement.New(tenantA, versionBID, shared.SHA256Digest(requirementMetadata), requirementMetadata)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := requirementRepository.Create(ctx, crossTenantRequirement); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant requirement parent class = %q: %v", typedClass(err), err)
+		}
 		if err := requirementRepository.Create(ctx, requirementA); typedClass(err) != shared.ErrorConflict {
 			t.Fatalf("duplicate requirement class = %q: %v", typedClass(err), err)
 		}
@@ -1159,6 +1191,13 @@ func TestPostgres(t *testing.T) {
 			if err := dependencyRepository.Create(ctx, dependency); err != nil {
 				t.Fatal(err)
 			}
+		}
+		crossTenantDependency, err := domainartifactdependency.New(tenantA, versionBID, 0, shared.SHA256Digest(dependencyMetadataA), dependencyMetadataA)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := dependencyRepository.Create(ctx, crossTenantDependency); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant dependency parent class = %q: %v", typedClass(err), err)
 		}
 		if err := dependencyRepository.Create(ctx, dependencyA0); typedClass(err) != shared.ErrorConflict {
 			t.Fatalf("duplicate dependency class = %q: %v", typedClass(err), err)
@@ -1349,6 +1388,9 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
 		}
 		result, _ := domainidempotency.NewResult(201, "publisher", "0198fc21-ced5-7000-8000-000000000214")
+		if _, err := repository.Complete(ctx, tenantB, record.Principal(), action, record.Key(), digest, result, now.Add(time.Second)); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant completion class = %q: %v", typedClass(err), err)
+		}
 		completed, err := repository.Complete(ctx, tenantA, record.Principal(), action, record.Key(), digest, result, now.Add(time.Second))
 		if established, ok := completed.Result(); err != nil || !ok || established.Status() != 201 || completed.State() != domainidempotency.StateCompleted {
 			t.Fatalf("complete: %#v %v", completed, err)
@@ -1447,7 +1489,13 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		if err != nil || len(claimed) != 1 || claimed[0].Attempts() != 1 || claimed[0].PayloadDigest() != messageA.PayloadDigest() {
 			t.Fatalf("claim: %#v %v", claimed, err)
 		}
+		if claimed[0].TenantID() != tenantA || claimed[0].ID() == messageB.ID() {
+			t.Fatalf("cross-tenant message claimed: %#v", claimed[0])
+		}
 		wrongToken := parse("0198fc21-ced5-7000-8000-000000000225")
+		if _, err := repository.Deliver(ctx, tenantB, messageA.ID(), claimOne, now.Add(2*time.Second)); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("cross-tenant delivery class = %q: %v", typedClass(err), err)
+		}
 		if _, err := repository.Deliver(ctx, tenantA, messageA.ID(), wrongToken, now.Add(2*time.Second)); typedClass(err) != shared.ErrorConflict {
 			t.Fatalf("stale completion class = %q: %v", typedClass(err), err)
 		}

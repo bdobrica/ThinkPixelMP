@@ -173,6 +173,16 @@ Outbox coverage includes transactional tenant-local sequence allocation, exact
 event/digest preservation, ordered claims, retry timing, expired-lease reclaim,
 stale-token rejection, dead-letter and successful-delivery metadata, tenant
 isolation, immutable payload guards, and delivered/dead-letter retention minima.
+
+Tenant-isolation coverage spans every implemented PostgreSQL repository. The
+suite creates colliding logical identities in two tenants through a
+`NOSUPERUSER NOBYPASSRLS` service role, then verifies tenant-filtered lookup and
+list behavior. It also proves that cross-tenant Publisher and Namespace
+delegation state changes, Idempotency completion, Outbox claiming/delivery, and
+Artifact, ArtifactVersion, Source, Descriptor, Requirement, and Dependency
+parent references fail closed. AuditEvent reads remain tenant-isolated, and
+Outbox sequences remain tenant-local. These checks exercise repository tenant
+predicates together with forced RLS and tenant-consistent database constraints.
+
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
-both when changing migrations. Broader aggregate persistence coverage remains
-DB-016.
+both when changing migrations or PostgreSQL repositories.

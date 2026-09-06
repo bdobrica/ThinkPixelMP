@@ -86,7 +86,11 @@ update or delete operation. The ArtifactDependency repository additionally needs
 update or delete operation. All mutation repositories also require `INSERT` on
 `audit_events`; audit readers require `SELECT`. No service repository receives
 `UPDATE` or `DELETE` on the append-only audit trail. Grant only the table operations
-needed by implemented repositories.
+needed by implemented repositories. The IdempotencyRecord repository requires
+`SELECT, INSERT, UPDATE` on `idempotency_records`; its update is constrained to
+one pending-to-completed transition. It exposes no deletion operation. A separate
+authorized retention job may receive narrowly scoped deletion permission when
+that job is implemented.
 
 Future repositories must derive tenant identity from verified authentication,
 open a transaction, and set its local scope using a bound parameter:
@@ -147,6 +151,9 @@ guards.
 Audit coverage includes required verified actor correlation, transaction rollback
 when audit recording fails, immutable tenant-isolated reads, bounded structured
 fields, and deferred database rejection of otherwise valid unaudited mutations.
+Idempotency coverage includes tenant/principal/action/key ownership, canonical
+request-digest mismatch rejection, replay of established results, cross-tenant
+isolation, one-way completion guards, and the minimum retention window.
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations. Broader aggregate persistence coverage remains
 DB-016.

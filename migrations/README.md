@@ -109,5 +109,17 @@ guards make the trail append-only. Tenant provisioning audit, transactional outb
 delivery, and the general transaction manager remain DB-013/DB-014 and later
 application work.
 
+`000012_idempotency_records.sql` creates tenant-scoped IdempotencyRecord ownership
+for mutating requests. A unique `(tenant, principal, action, key)` tuple binds one
+canonical SHA-256 request digest and progresses only once from pending to a
+completed HTTP status plus optional opaque resource identity. Reuse cannot rewrite
+the request digest or established result. Forced RLS protects all access, the
+schema enforces at least 24 hours of retention, and an expiry index supports a
+future policy-driven cleanup job. The repository claims or reads an existing key,
+rejects different-content reuse, and completes identical requests idempotently.
+Coupling a claim, domain mutation, audit, and outbox record through the general
+transaction manager remains DB-013/DB-014; concurrent stress coverage remains
+DB-020.
+
 See [database operations](../docs/operations/development-database.md) for command,
 credential, RLS context, and test guidance.

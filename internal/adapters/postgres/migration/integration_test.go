@@ -21,6 +21,7 @@ import (
 	postgresartifactsource "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactsource"
 	postgresartifactversion "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactversion"
 	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
+	postgresidempotency "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/idempotency"
 	postgresnamespace "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/namespace"
 	postgrespublisher "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/publisher"
 	domainartifact "github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
@@ -30,6 +31,7 @@ import (
 	domainartifactsource "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactsource"
 	domainartifactversion "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactversion"
 	domainaudit "github.com/bdobrica/ThinkPixelMP/internal/domain/audit"
+	domainidempotency "github.com/bdobrica/ThinkPixelMP/internal/domain/idempotency"
 	domainnamespace "github.com/bdobrica/ThinkPixelMP/internal/domain/namespace"
 	domainpublisher "github.com/bdobrica/ThinkPixelMP/internal/domain/publisher"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
@@ -101,7 +103,7 @@ func TestPostgres(t *testing.T) {
 	t.Run("empty_repeat_and_RLS", func(t *testing.T) {
 		conn := newDB(t, "tenant_test")
 		states, err := Run(ctx, conn, migrations.Files, false)
-		if err != nil || len(states) != 11 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied {
+		if err != nil || len(states) != 12 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied {
 			t.Fatalf("empty status: %v %v", states, err)
 		}
 		var exists bool
@@ -115,7 +117,7 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		states, err = Run(ctx, conn, migrations.Files, false)
-		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied {
+		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied {
 			t.Fatalf("applied status: %v %v", states, err)
 		}
 		execSQL := func(sql string) {
@@ -957,6 +959,84 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			t.Fatal("failed mutation changed the registered ArtifactVersion")
 		}
 	})
+	t.Run("idempotency_repository", func(t *testing.T) {
+		conn := newDB(t, "idempotency_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		tenantAValue := "0198fc21-ced5-7000-8000-000000000210"
+		tenantBValue := "0198fc21-ced5-7000-8000-000000000211"
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s'), ('%s')", tenantAValue, tenantBValue))
+		execSQL("CREATE ROLE db012_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.idempotency_records TO db012_service")
+		execSQL("SET ROLE db012_service")
+
+		parse := func(value string) shared.UUID {
+			parsed, parseErr := shared.ParseUUID(value)
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			return parsed
+		}
+		tenantA, tenantB := parse(tenantAValue), parse(tenantBValue)
+		repository, err := postgresidempotency.NewRepository(conn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		action, _ := shared.NewReasonCode("publisher.create")
+		now := time.Date(2026, 9, 6, 10, 0, 0, 0, time.UTC)
+		digest := shared.SHA256Digest([]byte(`{"display_name":"Acme"}`))
+		record, _ := domainidempotency.New(tenantA, parse("0198fc21-ced5-7000-8000-000000000212"),
+			"oidc:issuer:subject", action, "publisher-request-1", digest, now, now.Add(24*time.Hour))
+		stored, created, err := repository.Acquire(ctx, record)
+		if err != nil || !created || stored.ID() != record.ID() || stored.State() != domainidempotency.StatePending {
+			t.Fatalf("acquire: %#v %v %v", stored, created, err)
+		}
+		duplicate, _ := domainidempotency.New(tenantA, parse("0198fc21-ced5-7000-8000-000000000213"),
+			"oidc:issuer:subject", action, "publisher-request-1", digest, now, now.Add(24*time.Hour))
+		stored, created, err = repository.Acquire(ctx, duplicate)
+		if err != nil || created || stored.ID() != record.ID() {
+			t.Fatalf("duplicate acquire: %#v %v %v", stored, created, err)
+		}
+		mismatch, _ := domainidempotency.New(tenantA, duplicate.ID(), duplicate.Principal(), action,
+			duplicate.Key(), shared.SHA256Digest([]byte("different")), now, now.Add(24*time.Hour))
+		if _, _, err := repository.Acquire(ctx, mismatch); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("request mismatch class = %q: %v", typedClass(err), err)
+		}
+		if _, err := repository.Get(ctx, tenantB, record.Principal(), action, record.Key()); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
+		}
+		result, _ := domainidempotency.NewResult(201, "publisher", "0198fc21-ced5-7000-8000-000000000214")
+		completed, err := repository.Complete(ctx, tenantA, record.Principal(), action, record.Key(), digest, result, now.Add(time.Second))
+		if established, ok := completed.Result(); err != nil || !ok || established.Status() != 201 || completed.State() != domainidempotency.StateCompleted {
+			t.Fatalf("complete: %#v %v", completed, err)
+		}
+		if _, err := repository.Complete(ctx, tenantA, record.Principal(), action, record.Key(), digest, result, now.Add(2*time.Second)); err != nil {
+			t.Fatalf("repeat completion: %v", err)
+		}
+		differentResult, _ := domainidempotency.NewResult(200, "publisher", "0198fc21-ced5-7000-8000-000000000214")
+		if _, err := repository.Complete(ctx, tenantA, record.Principal(), action, record.Key(), digest, differentResult, now.Add(2*time.Second)); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("result mismatch class = %q: %v", typedClass(err), err)
+		}
+
+		execSQL("RESET ROLE")
+		if _, err := conn.Exec(ctx, `UPDATE public.idempotency_records SET request_digest = $1
+ WHERE tenant_id = $2::uuid AND idempotency_record_id = $3::uuid`, shared.SHA256Digest([]byte("rewritten")).String(), tenantA.String(), record.ID().String()); err == nil {
+			t.Fatal("database allowed idempotency ownership mutation")
+		}
+		if _, err := conn.Exec(ctx, `INSERT INTO public.idempotency_records
+  (tenant_id, idempotency_record_id, principal_id, action, idempotency_key, request_digest, created_at, expires_at)
+ VALUES ($1::uuid, $2::uuid, 'principal', 'publisher.create', 'short-retention', $3, $4, $4 + INTERVAL '23 hours')`,
+			tenantA.String(), parse("0198fc21-ced5-7000-8000-000000000215").String(), digest.String(), now); err == nil {
+			t.Fatal("database accepted less than 24-hour retention")
+		}
+	})
 	t.Run("command", func(t *testing.T) {
 		_ = newDB(t, "command_test")
 		for i, action := range []string{"status", "up", "status", "up"} {
@@ -967,7 +1047,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			if i == 0 {
 				want = "pending"
 			}
-			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want
+			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want + "\n000012_idempotency_records.sql " + want
 			if err != nil || strings.TrimSpace(string(out)) != expected {
 				t.Fatalf("command %s: %s %v", action, out, err)
 			}
@@ -1026,7 +1106,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		}
 		wg.Wait()
 		var n int
-		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 11 {
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 12 {
 			t.Fatalf("concurrent ledger: %d %v", n, err)
 		}
 	})

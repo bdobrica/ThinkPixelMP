@@ -91,6 +91,12 @@ needed by implemented repositories. The IdempotencyRecord repository requires
 one pending-to-completed transition. It exposes no deletion operation. A separate
 authorized retention job may receive narrowly scoped deletion permission when
 that job is implemented.
+The OutboxMessage repository requires `SELECT, INSERT, UPDATE` on
+`tenant_event_sequences` and `outbox_messages`. Event insertion and sequence
+allocation use the caller's transaction; delivery-state updates are constrained
+by lease tokens and database transition guards. It exposes no deletion operation.
+A future sink worker receives these permissions only for configured tenants, and
+a separate retention identity may receive narrowly scoped deletion permission.
 
 Future repositories must derive tenant identity from verified authentication,
 open a transaction, and set its local scope using a bound parameter:
@@ -107,7 +113,7 @@ SQL callers can set it, so normal request handling must never expose arbitrary S
 or administrative connections. Mutation callers must also attach the verified
 principal plus optional UUIDv7 request ID and W3C trace ID through the audit actor
 context; request fields and forwarded headers are not authority. IAM claim mapping,
-tenant provisioning APIs, and transactional outbox records remain later work.
+tenant provisioning APIs, and general transaction composition remain later work.
 
 ## Verification
 
@@ -154,6 +160,10 @@ fields, and deferred database rejection of otherwise valid unaudited mutations.
 Idempotency coverage includes tenant/principal/action/key ownership, canonical
 request-digest mismatch rejection, replay of established results, cross-tenant
 isolation, one-way completion guards, and the minimum retention window.
+Outbox coverage includes transactional tenant-local sequence allocation, exact
+event/digest preservation, ordered claims, retry timing, expired-lease reclaim,
+stale-token rejection, dead-letter and successful-delivery metadata, tenant
+isolation, immutable payload guards, and delivered/dead-letter retention minima.
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations. Broader aggregate persistence coverage remains
 DB-016.

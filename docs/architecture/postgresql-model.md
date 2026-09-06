@@ -67,14 +67,26 @@ tenant-scoped AuditEvent facts with minimized actor, action, opaque resource,
 digest/reference, decision/reason, and request/trace correlation fields. Existing
 authoritative mutation repositories write their audit fact in the mutation
 transaction, while deferred database triggers reject commits without the matching
-fact. Outbox delivery, the general transaction manager, and optimistic concurrency
-remain sequenced as DB-013 through DB-015. DB-012 implements tenant-scoped
-IdempotencyRecord ownership using the contract tuple of tenant, principal, action,
-and key. Each tuple binds one canonical request digest, can establish one bounded
-HTTP status and optional opaque resource identity, and cannot be repurposed or
-rewritten. Records have a minimum 24-hour retention window, forced RLS, and an
-expiry index; cleanup remains an operator-policy concern. Transactional coupling
-to domain mutations and concurrent replay stress tests remain DB-014 and DB-020.
+fact. Outbox sink delivery remains later application work; the general transaction
+manager and optimistic concurrency remain sequenced as DB-014 and DB-015. DB-012
+implements tenant-scoped IdempotencyRecord ownership using the contract tuple of
+tenant, principal, action, and key. Each tuple binds one canonical request digest,
+can establish one bounded HTTP status and optional opaque resource identity, and
+cannot be repurposed or rewritten. Records have a minimum 24-hour retention
+window, forced RLS, and an expiry index; cleanup remains an operator-policy
+concern. Transactional coupling to domain mutations and concurrent replay stress
+tests remain DB-014 and DB-020.
+DB-013 implements the tenant-scoped transactional OutboxMessage store. It
+preserves exact bounded MarketplaceEvent bytes and their digest under a stable
+UUIDv7 event identity, allocates strictly increasing tenant-local sequences in
+the caller's transaction, and exposes ordered lease-token claims. Bounded retry
+delay and attempt metadata, stale-claim rejection, expired-lease reclamation,
+automatic attempt-exhaustion dead-lettering, and 30/90-day delivered/dead-letter
+retention minima support at-least-once delivery without changing or losing the
+logical event. Event construction accepts only the versioned MarketplaceEvent v1
+families and allowlisted payload fields. The sink worker, SSE surface, retention
+job, coupling to later event-producing mutations, and general transaction manager
+remain later work.
 See
 [migration files](../../migrations/README.md) and [database
 operations](../operations/development-database.md). The remaining aggregates,

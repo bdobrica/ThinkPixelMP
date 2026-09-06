@@ -23,6 +23,7 @@ import (
 	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	postgresidempotency "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/idempotency"
 	postgresnamespace "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/namespace"
+	postgresoutbox "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/outbox"
 	postgrespublisher "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/publisher"
 	domainartifact "github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
 	domainartifactdependency "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactdependency"
@@ -33,6 +34,7 @@ import (
 	domainaudit "github.com/bdobrica/ThinkPixelMP/internal/domain/audit"
 	domainidempotency "github.com/bdobrica/ThinkPixelMP/internal/domain/idempotency"
 	domainnamespace "github.com/bdobrica/ThinkPixelMP/internal/domain/namespace"
+	domainoutbox "github.com/bdobrica/ThinkPixelMP/internal/domain/outbox"
 	domainpublisher "github.com/bdobrica/ThinkPixelMP/internal/domain/publisher"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/bdobrica/ThinkPixelMP/migrations"
@@ -103,7 +105,7 @@ func TestPostgres(t *testing.T) {
 	t.Run("empty_repeat_and_RLS", func(t *testing.T) {
 		conn := newDB(t, "tenant_test")
 		states, err := Run(ctx, conn, migrations.Files, false)
-		if err != nil || len(states) != 12 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied {
+		if err != nil || len(states) != 13 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied || states[12].Applied {
 			t.Fatalf("empty status: %v %v", states, err)
 		}
 		var exists bool
@@ -117,7 +119,7 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		states, err = Run(ctx, conn, migrations.Files, false)
-		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied {
+		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied || !states[12].Applied {
 			t.Fatalf("applied status: %v %v", states, err)
 		}
 		execSQL := func(sql string) {
@@ -1037,6 +1039,135 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			t.Fatal("database accepted less than 24-hour retention")
 		}
 	})
+	t.Run("outbox_repository", func(t *testing.T) {
+		conn := newDB(t, "outbox_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		tenantAValue := "0198fc21-ced5-7000-8000-000000000220"
+		tenantBValue := "0198fc21-ced5-7000-8000-000000000221"
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s'), ('%s')", tenantAValue, tenantBValue))
+		execSQL("CREATE ROLE db013_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.tenant_event_sequences TO db013_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.outbox_messages TO db013_service")
+		execSQL("SET ROLE db013_service")
+
+		parse := func(value string) shared.UUID {
+			parsed, parseErr := shared.ParseUUID(value)
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			return parsed
+		}
+		tenantA, tenantB := parse(tenantAValue), parse(tenantBValue)
+		repository, err := postgresoutbox.NewRepository(conn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+		appendMessage := func(tenantID, messageID shared.UUID, at time.Time) domainoutbox.Message {
+			t.Helper()
+			tx, beginErr := conn.Begin(ctx)
+			if beginErr != nil {
+				t.Fatal(beginErr)
+			}
+			defer func() { _ = tx.Rollback(ctx) }()
+			if _, setErr := tx.Exec(ctx, `SELECT set_config('thinkpixelmp.tenant_id', $1, true)`, tenantID.String()); setErr != nil {
+				t.Fatal(setErr)
+			}
+			sequence, sequenceErr := postgresoutbox.NextSequence(ctx, tx, tenantID)
+			if sequenceErr != nil {
+				t.Fatal(sequenceErr)
+			}
+			payload := []byte(fmt.Sprintf(`{"specversion":"1.0","id":"%s","source":"urn:thinkpixel:mp:integration","type":"io.thinkpixel.mp.artifact.registered.v1","subject":"%s","time":"%s","datacontenttype":"%s","sequence":%d,"data":{"tenant_id":"%s","transaction_cursor":"cursor-%d","artifact_version_id":"%s","artifact_digest":"sha256:%s","descriptor_digest":"sha256:%s"}}`,
+				messageID.String(), messageID.String(), at.Format(time.RFC3339Nano), domainoutbox.DataContentType, sequence,
+				tenantID.String(), sequence, messageID.String(), strings.Repeat("a", 64), strings.Repeat("b", 64)))
+			message, messageErr := domainoutbox.New(tenantID, messageID, sequence, "urn:thinkpixel:mp:integration", "io.thinkpixel.mp.artifact.registered.v1", messageID.String(), payload, at)
+			if messageErr != nil {
+				t.Fatal(messageErr)
+			}
+			if recordErr := postgresoutbox.Record(ctx, tx, message); recordErr != nil {
+				t.Fatal(recordErr)
+			}
+			if commitErr := tx.Commit(ctx); commitErr != nil {
+				t.Fatal(commitErr)
+			}
+			return message
+		}
+		messageA := appendMessage(tenantA, parse("0198fc21-ced5-7000-8000-000000000222"), now)
+		messageB := appendMessage(tenantB, parse("0198fc21-ced5-7000-8000-000000000223"), now)
+		if messageA.Sequence() != 1 || messageB.Sequence() != 1 {
+			t.Fatal("tenant-local sequence did not start at one")
+		}
+		if _, err := repository.Get(ctx, tenantA, messageB.ID()); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant get class = %q: %v", typedClass(err), err)
+		}
+		claimOne := parse("0198fc21-ced5-7000-8000-000000000224")
+		claimed, err := repository.Claim(ctx, tenantA, "worker-a", claimOne, now.Add(time.Second), time.Minute, 10)
+		if err != nil || len(claimed) != 1 || claimed[0].Attempts() != 1 || claimed[0].PayloadDigest() != messageA.PayloadDigest() {
+			t.Fatalf("claim: %#v %v", claimed, err)
+		}
+		wrongToken := parse("0198fc21-ced5-7000-8000-000000000225")
+		if _, err := repository.Deliver(ctx, tenantA, messageA.ID(), wrongToken, now.Add(2*time.Second)); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("stale completion class = %q: %v", typedClass(err), err)
+		}
+		retryReason, _ := shared.NewReasonCode("sink.unavailable")
+		retryAt := now.Add(2 * time.Minute)
+		retried, err := repository.Retry(ctx, tenantA, messageA.ID(), claimOne, retryReason, retryAt)
+		if lastError, ok := retried.LastError(); err != nil || retried.State() != domainoutbox.StateRetry || !ok || lastError != retryReason {
+			t.Fatalf("retry: %#v %v", retried, err)
+		}
+		claimed, err = repository.Claim(ctx, tenantA, "worker-a", wrongToken, retryAt.Add(-time.Second), time.Minute, 10)
+		if err != nil || len(claimed) != 0 {
+			t.Fatalf("early retry claim: %#v %v", claimed, err)
+		}
+		claimed, err = repository.Claim(ctx, tenantA, "worker-a", wrongToken, retryAt, time.Minute, 10)
+		if err != nil || len(claimed) != 1 || claimed[0].Attempts() != 2 {
+			t.Fatalf("retry claim: %#v %v", claimed, err)
+		}
+		claimThree := parse("0198fc21-ced5-7000-8000-000000000226")
+		claimed, err = repository.Claim(ctx, tenantA, "worker-b", claimThree, retryAt.Add(time.Minute), time.Minute, 10)
+		if err != nil || len(claimed) != 1 || claimed[0].Attempts() != 3 {
+			t.Fatalf("lease reclaim: %#v %v", claimed, err)
+		}
+		if _, err := repository.Deliver(ctx, tenantA, messageA.ID(), wrongToken, retryAt.Add(time.Minute)); typedClass(err) != shared.ErrorConflict {
+			t.Fatalf("expired claim completion class = %q: %v", typedClass(err), err)
+		}
+		deadReason, _ := shared.NewReasonCode("sink.rejected")
+		dead, err := repository.DeadLetter(ctx, tenantA, messageA.ID(), claimThree, deadReason, retryAt.Add(time.Minute))
+		retainUntil, retained := dead.RetainUntil()
+		if err != nil || dead.State() != domainoutbox.StateDeadLetter || !retained || retainUntil.Before(retryAt.Add(time.Minute).Add(domainoutbox.DeadLetterRetention)) {
+			t.Fatalf("dead letter: %#v %v", dead, err)
+		}
+
+		messageTwo := appendMessage(tenantA, parse("0198fc21-ced5-7000-8000-000000000227"), now.Add(time.Second))
+		claimFour := parse("0198fc21-ced5-7000-8000-000000000228")
+		claimed, err = repository.Claim(ctx, tenantA, "worker-a", claimFour, now.Add(2*time.Second), time.Minute, 10)
+		if err != nil || len(claimed) != 1 || claimed[0].ID() != messageTwo.ID() || messageTwo.Sequence() != 2 {
+			t.Fatalf("ordered second claim: %#v %v", claimed, err)
+		}
+		delivered, err := repository.Deliver(ctx, tenantA, messageTwo.ID(), claimFour, now.Add(3*time.Second))
+		if _, retained := delivered.RetainUntil(); err != nil || delivered.State() != domainoutbox.StateDelivered || !retained {
+			t.Fatalf("deliver: %#v %v", delivered, err)
+		}
+
+		execSQL("RESET ROLE")
+		if _, err := conn.Exec(ctx, `UPDATE public.outbox_messages SET event_payload = $1 WHERE tenant_id = $2::uuid AND outbox_message_id = $3::uuid`, []byte(`{}`), tenantA.String(), messageA.ID().String()); err == nil {
+			t.Fatal("database allowed event payload mutation")
+		}
+		if _, err := conn.Exec(ctx, `INSERT INTO public.outbox_messages
+ (tenant_id, outbox_message_id, sequence, event_source, event_type, event_subject, event_payload, payload_digest, available_at, created_at)
+ VALUES ($1::uuid, $2::uuid, 99, 'urn:test', 'io.thinkpixel.mp.artifact.registered.v1', 'subject', $3, $4, $5, $5)`,
+			tenantA.String(), parse("0198fc21-ced5-7000-8000-000000000229").String(), messageA.Payload(), messageA.PayloadDigest().String(), now); err == nil {
+			t.Fatal("database accepted an unallocated event sequence")
+		}
+	})
 	t.Run("command", func(t *testing.T) {
 		_ = newDB(t, "command_test")
 		for i, action := range []string{"status", "up", "status", "up"} {
@@ -1047,7 +1178,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			if i == 0 {
 				want = "pending"
 			}
-			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want + "\n000012_idempotency_records.sql " + want
+			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want + "\n000012_idempotency_records.sql " + want + "\n000013_outbox_messages.sql " + want
 			if err != nil || strings.TrimSpace(string(out)) != expected {
 				t.Fatalf("command %s: %s %v", action, out, err)
 			}
@@ -1106,7 +1237,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		}
 		wg.Wait()
 		var n int
-		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 12 {
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 13 {
 			t.Fatalf("concurrent ledger: %d %v", n, err)
 		}
 	})

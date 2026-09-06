@@ -105,9 +105,9 @@ before committing, and deferred constraint triggers reject Publisher, Namespace,
 Artifact, ArtifactVersion, ArtifactSource, ArtifactDescriptor,
 ArtifactRequirement, and ArtifactDependency mutations that lack the matching
 same-transaction audit event. Forced RLS protects reads and inserts; update/delete
-guards make the trail append-only. Tenant provisioning audit, transactional outbox
-delivery, and the general transaction manager remain DB-013/DB-014 and later
-application work.
+guards make the trail append-only. Tenant provisioning audit, outbox sink
+delivery, and the general transaction manager remain DB-014 and later application
+work.
 
 `000012_idempotency_records.sql` creates tenant-scoped IdempotencyRecord ownership
 for mutating requests. A unique `(tenant, principal, action, key)` tuple binds one
@@ -118,8 +118,21 @@ schema enforces at least 24 hours of retention, and an expiry index supports a
 future policy-driven cleanup job. The repository claims or reads an existing key,
 rejects different-content reuse, and completes identical requests idempotently.
 Coupling a claim, domain mutation, audit, and outbox record through the general
-transaction manager remains DB-013/DB-014; concurrent stress coverage remains
+transaction manager remains DB-014; concurrent stress coverage remains
 DB-020.
+
+`000013_outbox_messages.sql` creates the tenant-scoped transactional outbox and
+its per-tenant sequence allocator. Exact bounded CloudEvent bytes and their
+SHA-256 digest are immutable, UUIDv7 event IDs remain stable across delivery,
+and sequences are allocated monotonically inside the caller's transaction.
+Forced RLS protects both relations. Worker claims use bounded leases, attempt
+counts, opaque UUIDv7 claim tokens, ordered `SKIP LOCKED` selection, and expired
+lease reclamation. Retry scheduling accepts only bounded stable error codes and a
+maximum 24-hour delay; delivery and dead-letter transitions enforce the default
+30-day and 90-day retention minima. Exhausted expired claims are moved to
+dead-letter state without altering or discarding the original event. The worker,
+HTTP event sink, SSE delivery, retention deletion, and general transaction
+manager remain later work.
 
 See [database operations](../docs/operations/development-database.md) for command,
 credential, RLS context, and test guidance.

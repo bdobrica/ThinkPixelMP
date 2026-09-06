@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactversion"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
@@ -53,6 +54,13 @@ func (repository *Repository) Create(ctx context.Context, value domain.ArtifactV
 	}
 	if result.RowsAffected() != 1 {
 		return typed(shared.ErrorNotFound, "artifact_version.artifact_or_publisher_not_found")
+	}
+	digest := value.Digest()
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: value.TenantID(), Action: postgresaudit.ActionArtifactVersionRegistered,
+		ResourceType: "artifact_version", ResourceID: value.ID().String(), ArtifactDigest: &digest,
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return unavailable()

@@ -20,6 +20,7 @@ import (
 	postgresartifactrequirement "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactrequirement"
 	postgresartifactsource "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactsource"
 	postgresartifactversion "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/artifactversion"
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	postgresnamespace "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/namespace"
 	postgrespublisher "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/publisher"
 	domainartifact "github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
@@ -28,11 +29,13 @@ import (
 	domainartifactrequirement "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactrequirement"
 	domainartifactsource "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactsource"
 	domainartifactversion "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactversion"
+	domainaudit "github.com/bdobrica/ThinkPixelMP/internal/domain/audit"
 	domainnamespace "github.com/bdobrica/ThinkPixelMP/internal/domain/namespace"
 	domainpublisher "github.com/bdobrica/ThinkPixelMP/internal/domain/publisher"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/bdobrica/ThinkPixelMP/migrations"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // This suite always uses its own disposable pinned PostgreSQL container. It never
@@ -55,6 +58,15 @@ func TestPostgres(t *testing.T) {
 	address := strings.TrimSpace(string(out))
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
+	requestID, err := shared.ParseUUID("0198fc21-ced5-7000-8000-000000000009")
+	if err != nil {
+		t.Fatal(err)
+	}
+	auditActor, err := domainaudit.NewActor("integration:test-principal", &requestID, strings.Repeat("a", 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	ctx = domainaudit.WithActor(ctx, auditActor)
 	connect := func(db string) (*pgx.Conn, error) {
 		return pgx.Connect(ctx, "postgres://postgres@"+address+"/"+db+"?sslmode=disable")
 	}
@@ -89,7 +101,7 @@ func TestPostgres(t *testing.T) {
 	t.Run("empty_repeat_and_RLS", func(t *testing.T) {
 		conn := newDB(t, "tenant_test")
 		states, err := Run(ctx, conn, migrations.Files, false)
-		if err != nil || len(states) != 10 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied {
+		if err != nil || len(states) != 11 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied {
 			t.Fatalf("empty status: %v %v", states, err)
 		}
 		var exists bool
@@ -103,7 +115,7 @@ func TestPostgres(t *testing.T) {
 			}
 		}
 		states, err = Run(ctx, conn, migrations.Files, false)
-		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied {
+		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied {
 			t.Fatalf("applied status: %v %v", states, err)
 		}
 		execSQL := func(sql string) {
@@ -176,6 +188,7 @@ func TestPostgres(t *testing.T) {
 		execSQL("GRANT SELECT ON public.tenants TO db002_service")
 		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db002_service")
 		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db002_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db002_service")
 		execSQL("SET ROLE db002_service")
 
 		repository, err := postgrespublisher.NewRepository(conn)
@@ -223,8 +236,61 @@ func TestPostgres(t *testing.T) {
 		if _, err := repository.ChangeState(ctx, a, publisherAID, domainpublisher.StateClaimed, reason, "invalid", now.Add(2*time.Minute)); typedClass(err) != shared.ErrorConflict {
 			t.Fatalf("invalid transition class = %q: %v", typedClass(err), err)
 		}
+		unauditedID := parse("0198fc21-ced5-7000-8000-000000000022")
+		unaudited, _ := domainpublisher.New(a, unauditedID, "no-actor", "No actor", "", now)
+		if err := repository.Create(context.Background(), unaudited); typedClass(err) != shared.ErrorUnauthorized {
+			t.Fatalf("missing audit actor class = %q: %v", typedClass(err), err)
+		}
+		if _, err := repository.Get(ctx, a, unauditedID); typedClass(err) != shared.ErrorNotFound {
+			t.Fatal("mutation survived failed audit recording")
+		}
+		auditRepository, err := postgresaudit.NewRepository(conn)
+		if err != nil {
+			t.Fatal(err)
+		}
+		auditEvents, err := auditRepository.List(ctx, a, nil, 20)
+		if err != nil || len(auditEvents) != 2 {
+			t.Fatalf("publisher audits: %#v %v", auditEvents, err)
+		}
+		decision, hasDecision := auditEvents[1].Decision()
+		if auditEvents[0].ActorID() != "integration:test-principal" || auditEvents[1].Action().String() != postgresaudit.ActionPublisherStateChanged || !hasDecision || decision.String() != "verified" {
+			t.Fatalf("publisher audit content: %#v", auditEvents)
+		}
+		if _, err := auditRepository.Get(ctx, b, auditEvents[0].ID()); typedClass(err) != shared.ErrorNotFound {
+			t.Fatalf("cross-tenant audit get class = %q: %v", typedClass(err), err)
+		}
 
 		execSQL("RESET ROLE")
+		if _, err := conn.Exec(ctx, `UPDATE public.audit_events SET actor_id = 'rewritten' WHERE tenant_id = $1::uuid`, tenantA); err == nil {
+			t.Fatal("database allowed AuditEvent mutation")
+		}
+		if _, err := conn.Exec(ctx, `DELETE FROM public.audit_events WHERE tenant_id = $1::uuid`, tenantA); err == nil {
+			t.Fatal("database allowed AuditEvent deletion")
+		}
+		directTx, err := conn.Begin(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		directPublisherID := parse("0198fc21-ced5-7000-8000-000000000023").String()
+		if _, err := directTx.Exec(ctx, `INSERT INTO public.publishers
+  (tenant_id, publisher_id, slug, current_state_version, created_at)
+	VALUES ($1::uuid, $2::uuid, 'direct-unaudited', 1, $3)`, tenantA, directPublisherID, now); err != nil {
+			t.Fatal(err)
+		}
+		if _, err := directTx.Exec(ctx, `INSERT INTO public.publisher_state_records
+  (tenant_id, publisher_id, version, state, recorded_at)
+ VALUES ($1::uuid, $2::uuid, 1, 'claimed', $3)`, tenantA, directPublisherID, now); err != nil {
+			t.Fatal(err)
+		}
+		commitErr := directTx.Commit(ctx)
+		var postgresError *pgconn.PgError
+		if !errors.As(commitErr, &postgresError) || postgresError.ConstraintName != "mutation_audit_required" {
+			t.Fatal("database committed an authoritative mutation without audit")
+		}
+		var unauditedCount int
+		if err := conn.QueryRow(ctx, `SELECT count(*) FROM public.publishers WHERE tenant_id = $1::uuid AND publisher_id = $2::uuid`, tenantA, directPublisherID).Scan(&unauditedCount); err != nil || unauditedCount != 0 {
+			t.Fatal("failed unaudited transaction retained domain state")
+		}
 		if _, err := conn.Exec(ctx, `UPDATE public.publisher_state_records SET state = 'suspended' WHERE tenant_id = $1::uuid`, tenantA); err == nil {
 			t.Fatal("append-only state record was mutable")
 		}
@@ -257,6 +323,7 @@ func TestPostgres(t *testing.T) {
 		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db003_service")
 		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db003_service")
 		execSQL("GRANT SELECT, INSERT ON public.namespaces TO db003_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db003_service")
 		execSQL("SET ROLE db003_service")
 
 		parse := func(value string) shared.UUID {
@@ -373,6 +440,7 @@ func TestPostgres(t *testing.T) {
 		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db004_service")
 		execSQL("GRANT SELECT, INSERT ON public.namespaces TO db004_service")
 		execSQL("GRANT SELECT, INSERT ON public.artifacts TO db004_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db004_service")
 		execSQL("SET ROLE db004_service")
 
 		publisherRepository, _ := postgrespublisher.NewRepository(conn)
@@ -497,6 +565,7 @@ func TestPostgres(t *testing.T) {
 		execSQL("GRANT SELECT, INSERT ON public.artifact_descriptors TO db005_service")
 		execSQL("GRANT SELECT, INSERT ON public.artifact_requirements TO db005_service")
 		execSQL("GRANT SELECT, INSERT ON public.artifact_dependencies TO db005_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db005_service")
 		execSQL("SET ROLE db005_service")
 
 		publisherRepository, _ := postgrespublisher.NewRepository(conn)
@@ -898,7 +967,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			if i == 0 {
 				want = "pending"
 			}
-			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want
+			expected := "000001_tenants.sql " + want + "\n000002_publishers.sql " + want + "\n000003_namespaces.sql " + want + "\n000004_artifacts.sql " + want + "\n000005_artifact_versions.sql " + want + "\n000006_artifact_version_mutation_guards.sql " + want + "\n000007_artifact_sources.sql " + want + "\n000008_artifact_descriptors.sql " + want + "\n000009_artifact_requirements.sql " + want + "\n000010_artifact_dependencies.sql " + want + "\n000011_audit_events.sql " + want
 			if err != nil || strings.TrimSpace(string(out)) != expected {
 				t.Fatalf("command %s: %s %v", action, out, err)
 			}
@@ -932,7 +1001,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := conn.Exec(ctx, "INSERT INTO public.schema_migrations (name, checksum) VALUES ('000011_unknown.sql', repeat('0',64))"); err != nil {
+		if _, err := conn.Exec(ctx, "INSERT INTO public.schema_migrations (name, checksum) VALUES ('000012_unknown.sql', repeat('0',64))"); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := Run(ctx, conn, migrations.Files, true); err == nil {
@@ -957,7 +1026,7 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 		}
 		wg.Wait()
 		var n int
-		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 10 {
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&n); err != nil || n != 11 {
 			t.Fatalf("concurrent ledger: %d %v", n, err)
 		}
 	})

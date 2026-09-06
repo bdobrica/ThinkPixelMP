@@ -83,8 +83,10 @@ ArtifactRequirement repository additionally needs `SELECT, INSERT` on
 update or delete operation. The ArtifactDependency repository additionally needs
 `SELECT, INSERT` on `artifact_dependencies` and `SELECT` on
 `artifact_descriptors`; it exposes ordered create/read/list operations and no
-update or delete operation. Grant only the table operations needed by implemented
-repositories.
+update or delete operation. All mutation repositories also require `INSERT` on
+`audit_events`; audit readers require `SELECT`. No service repository receives
+`UPDATE` or `DELETE` on the append-only audit trail. Grant only the table operations
+needed by implemented repositories.
 
 Future repositories must derive tenant identity from verified authentication,
 open a transaction, and set its local scope using a bound parameter:
@@ -98,8 +100,10 @@ and use tenant-consistent keys. Missing or reset context sees no tenant rows;
 cross-tenant reads and writes fail closed. Transaction-local settings avoid leaking
 scope across pooled connections. The setting is defense in depth, not authentication:
 SQL callers can set it, so normal request handling must never expose arbitrary SQL
-or administrative connections. Tenant provisioning APIs and their audit/outbox
-transactions are not implemented by this schema bootstrap.
+or administrative connections. Mutation callers must also attach the verified
+principal plus optional UUIDv7 request ID and W3C trace ID through the audit actor
+context; request fields and forwarded headers are not authority. IAM claim mapping,
+tenant provisioning APIs, and transactional outbox records remain later work.
 
 ## Verification
 
@@ -140,6 +144,9 @@ declaration ordering, exact normalized-byte and digest round trips, equality wit
 the corresponding parent descriptor array element, repeated declarations across
 tenants, tenant isolation, duplicate rejection, and immutable update/delete
 guards.
+Audit coverage includes required verified actor correlation, transaction rollback
+when audit recording fails, immutable tenant-isolated reads, bounded structured
+fields, and deferred database rejection of otherwise valid unaudited mutations.
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations. Broader aggregate persistence coverage remains
 DB-016.

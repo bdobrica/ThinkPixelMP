@@ -120,7 +120,7 @@ Completion metadata format:
 - [x] DB-008 Add ArtifactDescriptor persistence using bounded normalized metadata. — completed 2026-09-05, commit bd8da31, evidence: `docs/evidence/db-008-artifact-descriptors.md`; `GOCACHE=/tmp/thinkpixelmp-db008-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db008-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-009 Add ArtifactRequirement persistence. — completed 2026-09-05, commit bd8da31, evidence: `docs/evidence/db-009-artifact-requirements.md`; `GOCACHE=/tmp/thinkpixelmp-db009-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db009-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-010 Add ArtifactDependency persistence. — completed 2026-09-05, commit bd8da31, evidence: `docs/evidence/db-010-artifact-dependencies.md`; `GOCACHE=/tmp/thinkpixelmp-db010-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db010-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] DB-011 Add AuditEvent schema and transactionally coupled mutation audit.
+- [x] DB-011 Add AuditEvent schema and transactionally coupled mutation audit. — completed 2026-09-05, commit pending (working tree), evidence: `docs/evidence/db-011-audit-events.md`; `GOCACHE=/tmp/thinkpixelmp-db011-go-cache GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOCACHE=/tmp/thinkpixelmp-db011-go-cache GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] DB-012 Add IdempotencyRecord with tenant/principal/action/request-digest ownership.
 - [ ] DB-013 Add transactional OutboxMessage with replay-safe claiming/retry/dead-letter metadata.
 - [ ] DB-014 Add transaction manager and repository interfaces.

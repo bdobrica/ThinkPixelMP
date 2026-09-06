@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactsource"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/jackc/pgx/v5"
@@ -53,6 +54,13 @@ func (repository *Repository) Create(ctx context.Context, value domain.ArtifactS
 	}
 	if result.RowsAffected() != 1 {
 		return typed(shared.ErrorNotFound, "artifact_source.artifact_version_not_found")
+	}
+	digest := value.ResolvedDigest()
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: value.TenantID(), Action: postgresaudit.ActionArtifactSourceCreated,
+		ResourceType: "artifact_source", ResourceID: value.ArtifactVersionID().String(), ArtifactDigest: &digest,
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return unavailable()

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/namespace"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/jackc/pgx/v5"
@@ -46,6 +47,12 @@ func (repository *Repository) Create(ctx context.Context, value domain.Namespace
 			return typed(shared.ErrorConflict, "namespace.owner_not_verified")
 		}
 		return unavailable()
+	}
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: value.TenantID(), Action: postgresaudit.ActionNamespaceCreated,
+		ResourceType: "namespace", ResourceID: value.ID().String(),
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return unavailable()

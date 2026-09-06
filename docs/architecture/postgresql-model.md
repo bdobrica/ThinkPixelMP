@@ -62,8 +62,13 @@ preserves exact normalized declaration bytes and digests, stable names, logical
 targets, required/optional flags, optional source/catalog context, and the exact
 typed selector. Each row is bound to its declaration index in the parent
 descriptor; dependency names are unique within that parent. These records are
-resolution inputs only and cannot grant authority. General audit/outbox coupling
-and optimistic concurrency remain sequenced as DB-011 and DB-015. See
+resolution inputs only and cannot grant authority. DB-011 implements immutable,
+tenant-scoped AuditEvent facts with minimized actor, action, opaque resource,
+digest/reference, decision/reason, and request/trace correlation fields. Existing
+authoritative mutation repositories write their audit fact in the mutation
+transaction, while deferred database triggers reject commits without the matching
+fact. Outbox delivery, the general transaction manager, and optimistic concurrency
+remain sequenced as DB-013 through DB-015. See
 [migration files](../../migrations/README.md) and [database
 operations](../operations/development-database.md). The remaining aggregates,
 indexes, partitioning, and retention are still a logical model sequenced in Phase

@@ -96,5 +96,18 @@ row to the same array element in the parent descriptor. Forced RLS and
 update/delete guards protect the declarations. Dependency resolution, locks, and
 audit/outbox coupling remain separate sequenced work.
 
+`000011_audit_events.sql` creates immutable, tenant-scoped AuditEvent facts with
+database-generated UUIDv7 identities, verified actor identity, stable
+action/resource/decision/reason fields, exact artifact and evidence/policy
+references, and request/trace correlation. It excludes arbitrary request metadata
+and free-form explanations. Existing mutation repositories record their audit fact
+before committing, and deferred constraint triggers reject Publisher, Namespace,
+Artifact, ArtifactVersion, ArtifactSource, ArtifactDescriptor,
+ArtifactRequirement, and ArtifactDependency mutations that lack the matching
+same-transaction audit event. Forced RLS protects reads and inserts; update/delete
+guards make the trail append-only. Tenant provisioning audit, transactional outbox
+delivery, and the general transaction manager remain DB-013/DB-014 and later
+application work.
+
 See [database operations](../docs/operations/development-database.md) for command,
 credential, RLS context, and test guidance.

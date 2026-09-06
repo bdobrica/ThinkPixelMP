@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"time"
 
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/jackc/pgx/v5"
@@ -52,6 +53,12 @@ func (repository *Repository) Create(ctx context.Context, value domain.Artifact)
 	}
 	if result.RowsAffected() != 1 {
 		return typed(shared.ErrorNotFound, "artifact.namespace_not_found")
+	}
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: value.TenantID(), Action: postgresaudit.ActionArtifactCreated,
+		ResourceType: "artifact", ResourceID: value.ID().String(),
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return unavailable()

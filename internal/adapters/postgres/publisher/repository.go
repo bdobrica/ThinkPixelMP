@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"time"
 
+	postgresaudit "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/audit"
 	domain "github.com/bdobrica/ThinkPixelMP/internal/domain/publisher"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
 	"github.com/jackc/pgx/v5"
@@ -49,6 +50,12 @@ func (repository *Repository) Create(ctx context.Context, value domain.Publisher
 			return typed(shared.ErrorConflict, "publisher.conflict")
 		}
 		return unavailable()
+	}
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: value.TenantID(), Action: postgresaudit.ActionPublisherCreated,
+		ResourceType: "publisher", ResourceID: value.ID().String(),
+	}); err != nil {
+		return err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return unavailable()
@@ -168,6 +175,13 @@ func (repository *Repository) ChangeState(ctx context.Context, tenantID, publish
 	}
 	if err != nil {
 		return domain.Publisher{}, unavailable()
+	}
+	decision, _ := shared.NewReasonCode(string(state))
+	if err := postgresaudit.Record(ctx, tx, postgresaudit.RecordParams{
+		TenantID: tenantID, Action: postgresaudit.ActionPublisherStateChanged,
+		ResourceType: "publisher", ResourceID: publisherID.String(), Decision: &decision, ReasonCodes: []shared.ReasonCode{reason},
+	}); err != nil {
+		return domain.Publisher{}, err
 	}
 	if err := tx.Commit(ctx); err != nil {
 		return domain.Publisher{}, unavailable()

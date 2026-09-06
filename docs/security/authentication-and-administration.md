@@ -22,6 +22,26 @@ Initial tenant-scoped roles are:
 
 Roles have no implied inheritance. A principal receives only explicitly granted actions; multiple grants compose permissions. Domain checks such as namespace ownership, trusted producer scope, reviewer separation, and live lifecycle checks still apply after role authorization.
 
+The initial role-to-action mapping is exact:
+
+| Role | Administrative action |
+| --- | --- |
+| `publisher-admin` | `publisher.manage` |
+| `namespace-admin` | `namespace.manage` |
+| `publication-admin` | `publication.publish` |
+| `evidence-producer-admin` | `evidence_producer.manage` |
+| `reviewer` | `promotion.review` |
+| `catalog-admin` | `catalog.manage` |
+| `policy-admin` | `policy.activate` |
+| `revocation-admin` | `revocation.manage` |
+| `federation-admin` | `federation.manage` |
+
+Grant lookup uses the exact mapped tenant and opaque principal. Missing identity,
+unknown roles/actions, absent grants, and grants for another tenant or principal
+fail closed. Authorization answers only whether the principal holds the action;
+it cannot satisfy resource ownership, state-machine, separation-of-duty,
+evidence-scope, lifecycle, or other domain requirements.
+
 ## Boundary rules
 
 - Publisher verification cannot be self-issued through publication authority.

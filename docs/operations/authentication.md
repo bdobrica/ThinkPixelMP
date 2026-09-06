@@ -56,8 +56,11 @@ names, malformed shapes, wrong issuers, and invalid mapping configuration fail
 closed. Ordinary safe configuration rendering reports only the number of
 tenant mappings and does not expose their claim values or tenant IDs.
 
-Mapping establishes tenant and principal identity only. IAM-003 owns
-marketplace roles and administrative authorization. Until protected API
-handlers are introduced, an absent OIDC issuer leaves authentication
-unconfigured rather than enabling an alternative identity source. Local
-development authentication remains separately deferred to IAM-004.
+Mapping establishes tenant and principal identity only. Marketplace role
+grants are supplied separately to the administrative authorizer and are keyed
+by that exact mapped tenant and opaque principal. They are not read from token
+role claims, request data, marketplace content, or catalog-policy output. Until
+protected API handlers are introduced, an absent OIDC issuer leaves
+authentication unconfigured rather than enabling an alternative identity
+source. Local development authentication remains separately deferred to
+IAM-004.

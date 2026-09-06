@@ -1,7 +1,7 @@
 # Phase 1 engineering-foundation evidence
 
 - Date: 2026-09-01
-- Phase baseline commit: `0687d1f`
+- Phase baseline commit: `18318c4`
 - Exit gate: a clean checkout passes the baseline verification gate
 
 ## Outcome

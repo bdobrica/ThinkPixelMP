@@ -192,5 +192,13 @@ immutable identity constraints: the same semantic version with different
 digests, and different semantic versions with the same digest. Each race leaves
 one durable identity and one matching audit event, with no partial loser state.
 
+Partial registration rollback coverage invokes the ArtifactVersion application
+persistence seam against the real repositories and transaction manager. Injected
+failures after ArtifactVersion creation and after ArtifactSource plus mutation
+audit creation prove that the enclosing transaction removes the idempotency
+claim, version, source, and audit facts together. Retrying the identical request
+and idempotency key then succeeds, demonstrating that a failed attempt neither
+publishes partial identity nor poisons replay ownership.
+
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations or PostgreSQL repositories.

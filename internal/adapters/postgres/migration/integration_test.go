@@ -26,6 +26,7 @@ import (
 	postgresnamespace "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/namespace"
 	postgresoutbox "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/outbox"
 	postgrespublisher "github.com/bdobrica/ThinkPixelMP/internal/adapters/postgres/publisher"
+	"github.com/bdobrica/ThinkPixelMP/internal/app/publication"
 	domainartifact "github.com/bdobrica/ThinkPixelMP/internal/domain/artifact"
 	domainartifactdependency "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactdependency"
 	domainartifactdescriptor "github.com/bdobrica/ThinkPixelMP/internal/domain/artifactdescriptor"
@@ -38,6 +39,10 @@ import (
 	domainoutbox "github.com/bdobrica/ThinkPixelMP/internal/domain/outbox"
 	domainpublisher "github.com/bdobrica/ThinkPixelMP/internal/domain/publisher"
 	"github.com/bdobrica/ThinkPixelMP/internal/domain/shared"
+	"github.com/bdobrica/ThinkPixelMP/internal/ports/authorization"
+	"github.com/bdobrica/ThinkPixelMP/internal/ports/clock"
+	"github.com/bdobrica/ThinkPixelMP/internal/ports/identity"
+	"github.com/bdobrica/ThinkPixelMP/internal/security"
 	"github.com/bdobrica/ThinkPixelMP/migrations"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -1501,6 +1506,184 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			t.Fatalf("audit count after concurrent registration: %d %v", len(events), err)
 		}
 	})
+	t.Run("partial_registration_rollback", func(t *testing.T) {
+		conn := newDB(t, "partial_registration_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		parse := func(value string) shared.UUID {
+			t.Helper()
+			parsed, err := shared.ParseUUID(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+		parseDigest := func(character string) shared.Digest {
+			t.Helper()
+			parsed, err := shared.ParseDigest("sha256:" + strings.Repeat(character, 64))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+
+		tenantID := parse("0198fc21-ced5-7000-8000-000000000350")
+		publisherID := parse("0198fc21-ced5-7000-8000-000000000351")
+		namespaceID := parse("0198fc21-ced5-7000-8000-000000000352")
+		artifactID := parse("0198fc21-ced5-7000-8000-000000000353")
+		now := time.Date(2026, 9, 6, 13, 0, 0, 0, time.UTC)
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s')", tenantID))
+		execSQL("CREATE ROLE db019_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT ON public.tenants TO db019_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.namespaces TO db019_service")
+		execSQL("GRANT SELECT ON public.namespace_delegations TO db019_service")
+		execSQL("GRANT SELECT ON public.namespace_delegation_state_records TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.artifacts TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.artifact_versions TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.artifact_sources TO db019_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db019_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.idempotency_records TO db019_service")
+		execSQL("SET ROLE db019_service")
+
+		publisherRepository, _ := postgrespublisher.NewRepository(conn)
+		if err := publisherRepository.Create(ctx, mustPublisher(t, tenantID, publisherID, "acme", now)); err != nil {
+			t.Fatal(err)
+		}
+		reason, _ := shared.NewReasonCode("ownership.confirmed")
+		if _, err := publisherRepository.ChangeState(ctx, tenantID, publisherID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		namespaceRepository, _ := postgresnamespace.NewRepository(conn)
+		if err := namespaceRepository.Create(ctx, mustNamespace(t, tenantID, namespaceID, publisherID, now.Add(2*time.Minute))); err != nil {
+			t.Fatal(err)
+		}
+		artifactRepository, _ := postgresartifact.NewRepository(conn)
+		if err := artifactRepository.Create(ctx, mustArtifact(t, tenantID, artifactID, namespaceID, now.Add(3*time.Minute))); err != nil {
+			t.Fatal(err)
+		}
+
+		versionRepository, _ := postgresartifactversion.NewRepository(conn)
+		sourceRepository, _ := postgresartifactsource.NewRepository(conn)
+		idempotencyRepository, _ := postgresidempotency.NewRepository(conn)
+		auditRepository, _ := postgresaudit.NewRepository(conn)
+		transactionManager, _ := postgres.NewTransactionManager(conn)
+		authorizer, err := security.NewAuthorizer([]authorization.Grant{{
+			TenantID: tenantID, PrincipalID: "integration:test-principal", Role: authorization.RolePublicationAdmin,
+		}})
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids, err := shared.NewUUIDGenerator(clock.Fixed{Time: now.Add(4 * time.Minute)}, nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		failingSource := &registrationSourceFailure{Repository: sourceRepository}
+		failingIdempotency := &registrationIdempotencyFailure{Repository: idempotencyRepository}
+		service, err := publication.NewArtifactVersionService(publication.ArtifactVersionDependencies{
+			Artifacts: artifactRepository, Versions: versionRepository, Sources: failingSource,
+			Owners: namespaceRepository, Idempotency: failingIdempotency, Transactions: transactionManager,
+			Authorizer: authorizer, IDs: ids, Clock: clock.Fixed{Time: now.Add(4 * time.Minute)},
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		actor := identity.Identity{TenantID: tenantID, PrincipalID: "integration:test-principal"}
+		registrationAction, _ := shared.NewReasonCode("artifact_version.register")
+		command := func(version, digestCharacter string) publication.RegisterResolvedArtifactVersion {
+			digest := parseDigest(digestCharacter)
+			semantic, parseErr := domainartifactversion.ParseSemanticVersion(version)
+			if parseErr != nil {
+				t.Fatal(parseErr)
+			}
+			return publication.RegisterResolvedArtifactVersion{
+				ArtifactID: artifactID, PublisherID: publisherID, Version: semantic, Digest: digest,
+				Class: domainartifactversion.ClassInstructional, DeliveryModel: domainartifactversion.DeliveryOCI,
+				ResolvedSource: publication.ResolvedArtifactSource{
+					Kind: domainartifactsource.KindOCI, SubmittedReference: "registry.example/acme/reviewer:" + version,
+					ResolvedReference: "registry.example/acme/reviewer@" + digest.String(), ResolvedDigest: digest,
+				},
+			}
+		}
+		assertCounts := func(wantVersions, wantSources, wantAudits int) {
+			t.Helper()
+			transaction, err := conn.Begin(ctx)
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer func() { _ = transaction.Rollback(context.Background()) }()
+			if _, err := transaction.Exec(ctx, `SELECT set_config('thinkpixelmp.tenant_id', $1, true)`, tenantID.String()); err != nil {
+				t.Fatal(err)
+			}
+			for table, want := range map[string]int{"artifact_versions": wantVersions, "artifact_sources": wantSources} {
+				var got int
+				if err := transaction.QueryRow(ctx, "SELECT count(*) FROM public."+table+" WHERE tenant_id = $1::uuid", tenantID.String()).Scan(&got); err != nil || got != want {
+					t.Fatalf("%s count = %d, want %d: %v", table, got, want, err)
+				}
+			}
+			if err := transaction.Commit(ctx); err != nil {
+				t.Fatal(err)
+			}
+			events, err := auditRepository.List(ctx, tenantID, nil, 50)
+			if err != nil || len(events) != wantAudits {
+				t.Fatalf("audit count = %d, want %d: %v", len(events), wantAudits, err)
+			}
+		}
+		assertRolledBack := func(key string, candidate publication.RegisterResolvedArtifactVersion, wantVersions, wantSources, wantAudits int) {
+			t.Helper()
+			if _, err := versionRepository.GetBySemanticVersion(ctx, tenantID, artifactID, candidate.Version); typedCode(err) != "artifact_version.not_found" {
+				t.Fatalf("failed version lookup code = %q: %v", typedCode(err), err)
+			}
+			if _, err := versionRepository.GetByDigest(ctx, tenantID, candidate.Digest); typedCode(err) != "artifact_version.not_found" {
+				t.Fatalf("failed digest lookup code = %q: %v", typedCode(err), err)
+			}
+			if _, err := idempotencyRepository.Get(ctx, tenantID, actor.PrincipalID, registrationAction, key); typedCode(err) != "idempotency.not_found" {
+				t.Fatalf("failed idempotency lookup code = %q: %v", typedCode(err), err)
+			}
+			assertCounts(wantVersions, wantSources, wantAudits)
+		}
+		assertCompleted := func(key string) {
+			t.Helper()
+			record, err := idempotencyRepository.Get(ctx, tenantID, actor.PrincipalID, registrationAction, key)
+			if err != nil || record.State() != domainidempotency.StateCompleted {
+				t.Fatalf("completed idempotency record: %#v %v", record, err)
+			}
+		}
+
+		sourceCommand := command("3.0.0", "c")
+		failingSource.err = errors.New("injected source persistence failure")
+		if _, err := service.RegisterResolved(ctx, actor, "rollback-source", sourceCommand); !errors.Is(err, failingSource.err) {
+			t.Fatalf("source failure was not preserved: %v", err)
+		}
+		assertRolledBack("rollback-source", sourceCommand, 0, 0, 4)
+		failingSource.err = nil
+		if _, err := service.RegisterResolved(ctx, actor, "rollback-source", sourceCommand); err != nil {
+			t.Fatalf("retry after source rollback: %v", err)
+		}
+		assertCounts(1, 1, 6)
+		assertCompleted("rollback-source")
+
+		completionCommand := command("4.0.0", "d")
+		failingIdempotency.err = errors.New("injected idempotency completion failure")
+		if _, err := service.RegisterResolved(ctx, actor, "rollback-completion", completionCommand); !errors.Is(err, failingIdempotency.err) {
+			t.Fatalf("completion failure was not preserved: %v", err)
+		}
+		assertRolledBack("rollback-completion", completionCommand, 1, 1, 6)
+		failingIdempotency.err = nil
+		if _, err := service.RegisterResolved(ctx, actor, "rollback-completion", completionCommand); err != nil {
+			t.Fatalf("retry after completion rollback: %v", err)
+		}
+		assertCounts(2, 2, 8)
+		assertCompleted("rollback-completion")
+	})
 	t.Run("idempotency_repository", func(t *testing.T) {
 		conn := newDB(t, "idempotency_test")
 		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
@@ -1817,6 +2000,32 @@ func mustArtifact(t *testing.T, tenantID, artifactID, namespaceID shared.UUID, a
 		t.Fatal(err)
 	}
 	return value
+}
+
+type registrationSourceFailure struct {
+	domainartifactsource.Repository
+	err error
+}
+
+func (repository *registrationSourceFailure) Create(ctx context.Context, value domainartifactsource.ArtifactSource) error {
+	if repository.err != nil {
+		return repository.err
+	}
+	return repository.Repository.Create(ctx, value)
+}
+
+type registrationIdempotencyFailure struct {
+	domainidempotency.Repository
+	err error
+}
+
+func (repository *registrationIdempotencyFailure) Complete(ctx context.Context, tenantID shared.UUID, principal string,
+	action shared.ReasonCode, key string, digest shared.Digest, result domainidempotency.Result, at time.Time,
+) (domainidempotency.Record, error) {
+	if repository.err != nil {
+		return domainidempotency.Record{}, repository.err
+	}
+	return repository.Repository.Complete(ctx, tenantID, principal, action, key, digest, result, at)
 }
 
 func typedClass(err error) shared.ErrorClass {

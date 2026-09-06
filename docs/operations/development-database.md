@@ -184,5 +184,13 @@ parent references fail closed. AuditEvent reads remain tenant-isolated, and
 Outbox sequences remain tenant-local. These checks exercise repository tenant
 predicates together with forced RLS and tenant-consistent database constraints.
 
+Concurrent identity-registration coverage starts eight repository calls on
+independent service-role connections at the same barrier. Namespace path and
+Artifact logical-identity races each commit one winner and return stable
+conflicts for the other seven contenders. ArtifactVersion races cover both
+immutable identity constraints: the same semantic version with different
+digests, and different semantic versions with the same digest. Each race leaves
+one durable identity and one matching audit event, with no partial loser state.
+
 The ordinary `make verify` gate runs unit checks without requiring Docker; run
 both when changing migrations or PostgreSQL repositories.

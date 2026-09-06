@@ -1334,6 +1334,173 @@ SELECT $1::uuid, $2::uuid, $3::uuid, $4::uuid, 1, 'skill', 'acme/security', 'rev
 			t.Fatal("failed mutation changed the registered ArtifactVersion")
 		}
 	})
+	t.Run("concurrent_identity_registration", func(t *testing.T) {
+		conn := newDB(t, "concurrent_identity_test")
+		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+			t.Fatal(err)
+		}
+		execSQL := func(sql string) {
+			t.Helper()
+			if _, err := conn.Exec(ctx, sql); err != nil {
+				t.Fatal(err)
+			}
+		}
+		parse := func(value string) shared.UUID {
+			parsed, err := shared.ParseUUID(value)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+		parseDigest := func(character string) shared.Digest {
+			parsed, err := shared.ParseDigest("sha256:" + strings.Repeat(character, 64))
+			if err != nil {
+				t.Fatal(err)
+			}
+			return parsed
+		}
+
+		tenantID := parse("0198fc21-ced5-7000-8000-000000000300")
+		publisherID := parse("0198fc21-ced5-7000-8000-000000000301")
+		namespaceID := parse("0198fc21-ced5-7000-8000-000000000302")
+		artifactID := parse("0198fc21-ced5-7000-8000-000000000303")
+		now := time.Date(2026, 9, 6, 12, 0, 0, 0, time.UTC)
+		execSQL(fmt.Sprintf("INSERT INTO public.tenants (tenant_id) VALUES ('%s')", tenantID))
+		execSQL("CREATE ROLE db018_service NOSUPERUSER NOBYPASSRLS NOLOGIN")
+		execSQL("GRANT SELECT ON public.tenants TO db018_service")
+		execSQL("GRANT SELECT, INSERT, UPDATE ON public.publishers TO db018_service")
+		execSQL("GRANT SELECT, INSERT ON public.publisher_state_records TO db018_service")
+		execSQL("GRANT SELECT, INSERT ON public.namespaces TO db018_service")
+		execSQL("GRANT SELECT, INSERT ON public.artifacts TO db018_service")
+		execSQL("GRANT SELECT, INSERT ON public.artifact_versions TO db018_service")
+		execSQL("GRANT SELECT, INSERT ON public.audit_events TO db018_service")
+		execSQL("SET ROLE db018_service")
+
+		publisherRepository, _ := postgrespublisher.NewRepository(conn)
+		if err := publisherRepository.Create(ctx, mustPublisher(t, tenantID, publisherID, "acme", now)); err != nil {
+			t.Fatal(err)
+		}
+		reason, _ := shared.NewReasonCode("ownership.confirmed")
+		if _, err := publisherRepository.ChangeState(ctx, tenantID, publisherID, 1, domainpublisher.StateVerified, reason, "checked", now.Add(time.Minute)); err != nil {
+			t.Fatal(err)
+		}
+		namespaceRepository, _ := postgresnamespace.NewRepository(conn)
+		if err := namespaceRepository.Create(ctx, mustNamespace(t, tenantID, namespaceID, publisherID, now.Add(2*time.Minute))); err != nil {
+			t.Fatal(err)
+		}
+		artifactRepository, _ := postgresartifact.NewRepository(conn)
+		if err := artifactRepository.Create(ctx, mustArtifact(t, tenantID, artifactID, namespaceID, now.Add(3*time.Minute))); err != nil {
+			t.Fatal(err)
+		}
+
+		const contenders = 8
+		peers := make([]*pgx.Conn, contenders)
+		for index := range peers {
+			peer, err := connect("concurrent_identity_test")
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = peer.Close(context.Background()) })
+			if _, err := peer.Exec(ctx, "SET ROLE db018_service"); err != nil {
+				t.Fatal(err)
+			}
+			peers[index] = peer
+		}
+		concurrent := func(name, conflictCode string, create func(int) error) {
+			t.Helper()
+			ready := make(chan struct{}, contenders)
+			start := make(chan struct{})
+			results := make(chan error, contenders)
+			var registrations sync.WaitGroup
+			for index := range contenders {
+				registrations.Go(func() {
+					ready <- struct{}{}
+					<-start
+					results <- create(index)
+				})
+			}
+			for range contenders {
+				<-ready
+			}
+			close(start)
+			registrations.Wait()
+			close(results)
+			var successful, conflicts int
+			for err := range results {
+				switch typedCode(err) {
+				case "":
+					successful++
+				case conflictCode:
+					conflicts++
+				default:
+					t.Fatalf("%s returned unexpected error: %v", name, err)
+				}
+			}
+			if successful != 1 || conflicts != contenders-1 {
+				t.Fatalf("%s outcomes: successful=%d conflicts=%d", name, successful, conflicts)
+			}
+		}
+
+		concurrent("namespace path", "namespace.conflict", func(index int) error {
+			repository, _ := postgresnamespace.NewRepository(peers[index])
+			value, _ := domainnamespace.New(tenantID, parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", 0x310+index)), "acme/concurrent", publisherID, now.Add(4*time.Minute))
+			return repository.Create(ctx, value)
+		})
+		if got, err := namespaceRepository.GetByPath(ctx, tenantID, "acme/concurrent"); err != nil || got.Path() != "acme/concurrent" {
+			t.Fatalf("concurrent Namespace winner: %#v %v", got, err)
+		}
+
+		concurrent("artifact identity", "artifact.conflict", func(index int) error {
+			repository, _ := postgresartifact.NewRepository(peers[index])
+			value, _ := domainartifact.New(tenantID, parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", 0x320+index)), namespaceID, "acme/security", "concurrent", domainartifact.KindSkill, "", "", "", "", nil, now.Add(5*time.Minute))
+			return repository.Create(ctx, value)
+		})
+		identity, _ := shared.ParseArtifactReference("acme/security/concurrent")
+		if got, err := artifactRepository.GetByIdentity(ctx, tenantID, identity); err != nil || got.Identity() != identity {
+			t.Fatalf("concurrent Artifact winner: %#v %v", got, err)
+		}
+
+		semantic, _ := domainartifactversion.ParseSemanticVersion("1.0.0")
+		concurrent("ArtifactVersion semantic version", "artifact_version.conflict", func(index int) error {
+			repository, _ := postgresartifactversion.NewRepository(peers[index])
+			digest := parseDigest(fmt.Sprintf("%x", index))
+			value, _ := domainartifactversion.New(tenantID, parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", 0x330+index)), artifactID, publisherID, semantic, digest, domainartifact.KindSkill, domainartifactversion.ClassInstructional, domainartifactversion.DeliveryOCI, now.Add(6*time.Minute))
+			return repository.Create(ctx, value)
+		})
+		versionRepository, _ := postgresartifactversion.NewRepository(conn)
+		if got, err := versionRepository.GetBySemanticVersion(ctx, tenantID, artifactID, semantic); err != nil || got.SemanticVersion() != semantic {
+			t.Fatalf("concurrent semantic-version winner: %#v %v", got, err)
+		}
+
+		digest := parseDigest("f")
+		concurrent("ArtifactVersion digest", "artifact_version.conflict", func(index int) error {
+			repository, _ := postgresartifactversion.NewRepository(peers[index])
+			candidateSemantic, _ := domainartifactversion.ParseSemanticVersion(fmt.Sprintf("2.0.%d", index))
+			value, _ := domainartifactversion.New(tenantID, parse(fmt.Sprintf("0198fc21-ced5-7000-8000-%012x", 0x340+index)), artifactID, publisherID, candidateSemantic, digest, domainartifact.KindSkill, domainartifactversion.ClassInstructional, domainartifactversion.DeliveryOCI, now.Add(7*time.Minute))
+			return repository.Create(ctx, value)
+		})
+		if got, err := versionRepository.GetByDigest(ctx, tenantID, digest); err != nil || got.Digest() != digest {
+			t.Fatalf("concurrent digest winner: %#v %v", got, err)
+		}
+
+		namespaces, err := namespaceRepository.List(ctx, tenantID, nil, 50)
+		if err != nil || len(namespaces) != 2 {
+			t.Fatalf("Namespace count after concurrent registration: %d %v", len(namespaces), err)
+		}
+		artifacts, err := artifactRepository.List(ctx, tenantID, "", nil, 50)
+		if err != nil || len(artifacts) != 2 {
+			t.Fatalf("Artifact count after concurrent registration: %d %v", len(artifacts), err)
+		}
+		versions, err := versionRepository.List(ctx, tenantID, artifactID, nil, 50)
+		if err != nil || len(versions) != 2 {
+			t.Fatalf("ArtifactVersion count after concurrent registration: %d %v", len(versions), err)
+		}
+		auditRepository, _ := postgresaudit.NewRepository(conn)
+		events, err := auditRepository.List(ctx, tenantID, nil, 50)
+		if err != nil || len(events) != 8 {
+			t.Fatalf("audit count after concurrent registration: %d %v", len(events), err)
+		}
+	})
 	t.Run("idempotency_repository", func(t *testing.T) {
 		conn := newDB(t, "idempotency_test")
 		if _, err := Run(ctx, conn, migrations.Files, true); err != nil {

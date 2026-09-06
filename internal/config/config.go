@@ -24,14 +24,34 @@ const (
 	ModeProduction  Mode = "production"
 )
 
+// AuthenticationMode selects the configured identity source. OIDC remains the
+// safe default: without complete OIDC configuration no identity is accepted.
+type AuthenticationMode string
+
+const (
+	AuthenticationModeOIDC             AuthenticationMode = "oidc"
+	AuthenticationModeLocalDevelopment AuthenticationMode = "local-development"
+)
+
 type Config struct {
-	Mode       Mode
-	HTTP       HTTPConfig
-	Database   DatabaseConfig
-	OIDC       OIDCConfig
-	Log        LogConfig
-	Telemetry  TelemetryConfig
-	ConfigFile string
+	Mode           Mode
+	HTTP           HTTPConfig
+	Database       DatabaseConfig
+	Authentication AuthenticationConfig
+	OIDC           OIDCConfig
+	Log            LogConfig
+	Telemetry      TelemetryConfig
+	ConfigFile     string
+}
+
+type AuthenticationConfig struct {
+	Mode             AuthenticationMode         `json:"mode"`
+	LocalDevelopment LocalDevelopmentAuthConfig `json:"local_development"`
+}
+
+type LocalDevelopmentAuthConfig struct {
+	TenantID  string `json:"tenant_id,omitempty"`
+	Principal string `json:"principal,omitempty"`
 }
 
 type OIDCConfig struct {
@@ -97,9 +117,10 @@ func Defaults() Config {
 			StatementTimeout: 10 * time.Second, LockTimeout: 2 * time.Second,
 			MaxConnectionLifetime: 30 * time.Minute, MaxConnectionIdleTime: 5 * time.Minute,
 			MinConnections: 0, MaxConnections: 20},
-		OIDC:      OIDCConfig{ClockSkew: 30 * time.Second, DiscoveryTimeout: 5 * time.Second},
-		Log:       LogConfig{Level: "info"},
-		Telemetry: TelemetryConfig{Mode: "noop", ServiceName: "thinkpixelmp", SampleRatio: 0},
+		Authentication: AuthenticationConfig{Mode: AuthenticationModeOIDC},
+		OIDC:           OIDCConfig{ClockSkew: 30 * time.Second, DiscoveryTimeout: 5 * time.Second},
+		Log:            LogConfig{Level: "info"},
+		Telemetry:      TelemetryConfig{Mode: "noop", ServiceName: "thinkpixelmp", SampleRatio: 0},
 	}
 }
 
@@ -134,6 +155,9 @@ func (c Config) Validate() error {
 	if c.Mode == ModeProduction && !c.Database.URL.IsSet() {
 		return errors.New("database.url: a secret reference is required in production")
 	}
+	if err := c.Authentication.validate(c.Mode, c.OIDC); err != nil {
+		return err
+	}
 	if err := c.OIDC.validate(); err != nil {
 		return err
 	}
@@ -160,6 +184,32 @@ func (c Config) Validate() error {
 	return nil
 }
 
+func (c AuthenticationConfig) validate(mode Mode, oidc OIDCConfig) error {
+	localConfigured := c.LocalDevelopment.TenantID != "" || c.LocalDevelopment.Principal != ""
+	switch c.Mode {
+	case AuthenticationModeOIDC:
+		if localConfigured {
+			return errors.New("authentication.local_development: must be empty in OIDC mode")
+		}
+	case AuthenticationModeLocalDevelopment:
+		if mode != ModeDevelopment {
+			return errors.New("authentication.mode: local-development requires development process mode")
+		}
+		if oidc.configured() {
+			return errors.New("authentication.mode: local-development cannot be combined with OIDC configuration")
+		}
+		if _, err := shared.ParseUUID(c.LocalDevelopment.TenantID); err != nil {
+			return fmt.Errorf("authentication.local_development.tenant_id: %w", err)
+		}
+		if err := validateOIDCClaimText(c.LocalDevelopment.Principal, 237); err != nil {
+			return fmt.Errorf("authentication.local_development.principal: %w", err)
+		}
+	default:
+		return errors.New("authentication.mode: must be oidc or local-development")
+	}
+	return nil
+}
+
 func (c OIDCConfig) validate() error {
 	if c.ClockSkew < 0 || c.ClockSkew > 5*time.Minute {
 		return errors.New("oidc.clock_skew: must be between 0 and 5m")
@@ -167,9 +217,7 @@ func (c OIDCConfig) validate() error {
 	if c.DiscoveryTimeout <= 0 || c.DiscoveryTimeout > time.Minute {
 		return errors.New("oidc.discovery_timeout: must be positive and at most 1m")
 	}
-	configured := c.Issuer != "" || c.Audience != "" || len(c.AllowedAlgorithms) != 0 ||
-		c.TenantClaim != "" || c.PrincipalClaim != "" || len(c.TenantMappings) != 0
-	if !configured {
+	if !c.configured() {
 		return nil
 	}
 	u, err := url.Parse(c.Issuer)
@@ -219,6 +267,11 @@ func (c OIDCConfig) validate() error {
 	return nil
 }
 
+func (c OIDCConfig) configured() bool {
+	return c.Issuer != "" || c.Audience != "" || len(c.AllowedAlgorithms) != 0 ||
+		c.TenantClaim != "" || c.PrincipalClaim != "" || len(c.TenantMappings) != 0
+}
+
 func validateOIDCClaimText(value string, maximum int) error {
 	if len(value) == 0 || len(value) > maximum || !utf8.ValidString(value) || strings.IndexFunc(value, func(r rune) bool { return r < 0x20 || r == 0x7f }) >= 0 {
 		return fmt.Errorf("must contain 1 to %d valid UTF-8 bytes without control characters", maximum)
@@ -232,9 +285,10 @@ type safeSecretReference struct {
 }
 
 type safeConfig struct {
-	Mode     Mode       `json:"mode"`
-	HTTP     HTTPConfig `json:"http"`
-	Database struct {
+	Mode           Mode                 `json:"mode"`
+	Authentication AuthenticationConfig `json:"authentication"`
+	HTTP           HTTPConfig           `json:"http"`
+	Database       struct {
 		URL                   safeSecretReference `json:"url"`
 		ConnectTimeout        time.Duration       `json:"connect_timeout"`
 		HealthTimeout         time.Duration       `json:"health_timeout"`
@@ -264,7 +318,7 @@ type safeOIDCConfig struct {
 
 func (c Config) safe() safeConfig {
 	var out safeConfig
-	out.Mode, out.HTTP, out.Log, out.Telemetry = c.Mode, c.HTTP, c.Log, c.Telemetry
+	out.Mode, out.Authentication, out.HTTP, out.Log, out.Telemetry = c.Mode, c.Authentication, c.HTTP, c.Log, c.Telemetry
 	out.OIDC = safeOIDCConfig{Issuer: c.OIDC.Issuer, Audience: c.OIDC.Audience,
 		AllowedAlgorithms: append([]string(nil), c.OIDC.AllowedAlgorithms...), ClockSkew: c.OIDC.ClockSkew,
 		DiscoveryTimeout: c.OIDC.DiscoveryTimeout, TenantClaim: c.OIDC.TenantClaim,

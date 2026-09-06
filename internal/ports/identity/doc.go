@@ -35,6 +35,13 @@ type Identity struct {
 	PrincipalID string
 }
 
+// Authenticator establishes an identity from transport-extracted bearer
+// material. An empty credential is meaningful only to an explicitly selected
+// local-development adapter; production authenticators fail closed.
+type Authenticator interface {
+	Authenticate(context.Context, string) (Identity, error)
+}
+
 // Mapper assigns marketplace tenant and principal identity from verified
 // claims. It does not grant roles or administrative authority.
 type Mapper interface {

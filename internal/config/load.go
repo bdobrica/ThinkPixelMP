@@ -16,12 +16,23 @@ import (
 const maximumConfigFileSize = 1 << 20
 
 type rawConfig struct {
-	Mode      *Mode         `json:"mode"`
-	HTTP      *rawHTTP      `json:"http"`
-	Database  *rawDatabase  `json:"database"`
-	OIDC      *rawOIDC      `json:"oidc"`
-	Log       *rawLog       `json:"log"`
-	Telemetry *rawTelemetry `json:"telemetry"`
+	Mode           *Mode              `json:"mode"`
+	Authentication *rawAuthentication `json:"authentication"`
+	HTTP           *rawHTTP           `json:"http"`
+	Database       *rawDatabase       `json:"database"`
+	OIDC           *rawOIDC           `json:"oidc"`
+	Log            *rawLog            `json:"log"`
+	Telemetry      *rawTelemetry      `json:"telemetry"`
+}
+
+type rawAuthentication struct {
+	Mode             *AuthenticationMode            `json:"mode"`
+	LocalDevelopment *rawLocalDevelopmentAuthConfig `json:"local_development"`
+}
+
+type rawLocalDevelopmentAuthConfig struct {
+	TenantID  *string `json:"tenant_id"`
+	Principal *string `json:"principal"`
 }
 
 type rawOIDC struct {
@@ -155,6 +166,19 @@ func (r rawConfig) apply(c *Config) error {
 	if r.Mode != nil {
 		c.Mode = *r.Mode
 	}
+	if r.Authentication != nil {
+		if r.Authentication.Mode != nil {
+			c.Authentication.Mode = *r.Authentication.Mode
+		}
+		if local := r.Authentication.LocalDevelopment; local != nil {
+			if local.TenantID != nil {
+				c.Authentication.LocalDevelopment.TenantID = *local.TenantID
+			}
+			if local.Principal != nil {
+				c.Authentication.LocalDevelopment.Principal = *local.Principal
+			}
+		}
+	}
 	if r.HTTP != nil {
 		if r.HTTP.Address != nil {
 			c.HTTP.Address = *r.HTTP.Address
@@ -255,7 +279,10 @@ func (r rawConfig) apply(c *Config) error {
 type setter func(*Config, string) error
 
 var environmentSetters = map[string]setter{
-	"TPMP_MODE":                              func(c *Config, v string) error { c.Mode = Mode(v); return nil },
+	"TPMP_MODE":                func(c *Config, v string) error { c.Mode = Mode(v); return nil },
+	"TPMP_AUTHENTICATION_MODE": func(c *Config, v string) error { c.Authentication.Mode = AuthenticationMode(v); return nil },
+	"TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_TENANT_ID": func(c *Config, v string) error { c.Authentication.LocalDevelopment.TenantID = v; return nil },
+	"TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_PRINCIPAL": func(c *Config, v string) error { c.Authentication.LocalDevelopment.Principal = v; return nil },
 	"TPMP_HTTP_ADDRESS":                      func(c *Config, v string) error { c.HTTP.Address = v; return nil },
 	"TPMP_HTTP_READ_HEADER_TIMEOUT":          durationSetter("http.read_header_timeout", func(c *Config, d time.Duration) { c.HTTP.ReadHeaderTimeout = d }),
 	"TPMP_HTTP_READ_TIMEOUT":                 durationSetter("http.read_timeout", func(c *Config, d time.Duration) { c.HTTP.ReadTimeout = d }),

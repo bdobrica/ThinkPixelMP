@@ -14,6 +14,9 @@ Unknown JSON fields, `TPMP_*` variables, flags, positional arguments, malformed 
 | JSON path | Environment | Flag |
 | --- | --- | --- |
 | `mode` | `TPMP_MODE` | `--mode` |
+| `authentication.mode` | `TPMP_AUTHENTICATION_MODE` | `--authentication-mode` |
+| `authentication.local_development.tenant_id` | `TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_TENANT_ID` | `--authentication-local-development-tenant-id` |
+| `authentication.local_development.principal` | `TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_PRINCIPAL` | `--authentication-local-development-principal` |
 | `http.address` | `TPMP_HTTP_ADDRESS` | `--http-address` |
 | `http.read_header_timeout` | `TPMP_HTTP_READ_HEADER_TIMEOUT` | `--http-read-header-timeout` |
 | `http.read_timeout` | `TPMP_HTTP_READ_TIMEOUT` | `--http-read-timeout` |
@@ -45,7 +48,12 @@ Unknown JSON fields, `TPMP_*` variables, flags, positional arguments, malformed 
 | `telemetry.service_name` | `TPMP_TELEMETRY_SERVICE_NAME` | `--telemetry-service-name` |
 | `telemetry.sample_ratio` | `TPMP_TELEMETRY_SAMPLE_RATIO` | `--telemetry-sample-ratio` |
 
-Durations use Go duration syntax such as `500ms`, `5s`, or `30m`. Configuration supports `development`, `test`, and `production` modes. Defaults bind only to `127.0.0.1:8080`, enable no external telemetry exporter, impose bounded HTTP sizes and timeouts, and contain no database credential. Production requires `database.url` to be configured as a secret reference.
+Durations use Go duration syntax such as `500ms`, `5s`, or `30m`. Configuration supports `development`, `test`, and `production` modes. Defaults bind only to `127.0.0.1:8080`, select OIDC authentication without supplying an issuer or accepting an identity, enable no external telemetry exporter, impose bounded HTTP sizes and timeouts, and contain no database credential. Production requires `database.url` to be configured as a secret reference.
+
+The alternative `local-development` authentication mode requires an explicitly
+configured fixed UUIDv7 tenant and principal label. It is rejected outside
+`development` process mode and when any OIDC trust or mapping field is present.
+See [authentication configuration](authentication.md).
 
 ## Secret references
 

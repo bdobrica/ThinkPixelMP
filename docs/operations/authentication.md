@@ -62,5 +62,37 @@ by that exact mapped tenant and opaque principal. They are not read from token
 role claims, request data, marketplace content, or catalog-policy output. Until
 protected API handlers are introduced, an absent OIDC issuer leaves
 authentication unconfigured rather than enabling an alternative identity
-source. Local development authentication remains separately deferred to
-IAM-004.
+source.
+
+## Local development authentication
+
+For disposable local use, select a single fixed identity explicitly:
+
+```json
+{
+  "mode": "development",
+  "authentication": {
+    "mode": "local-development",
+    "local_development": {
+      "tenant_id": "0198fc21-ced5-7000-8000-000000000001",
+      "principal": "alice"
+    }
+  }
+}
+```
+
+The equivalent variables are `TPMP_AUTHENTICATION_MODE`,
+`TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_TENANT_ID`, and
+`TPMP_AUTHENTICATION_LOCAL_DEVELOPMENT_PRINCIPAL`; corresponding flags are
+lowercase and hyphenated. All three local settings are required. The tenant is
+a UUIDv7 and the bounded principal label becomes
+`local-development:<label>` in application identity, audit, and idempotency
+contexts.
+
+This adapter authenticates requests without bearer material because its sole
+identity comes from operator configuration. A supplied bearer credential is
+rejected rather than ignored. Local authentication is rejected unless process
+mode is exactly `development`; it cannot run in `test` or `production`, cannot
+be combined with any OIDC trust/mapping configuration, and grants no role or
+action. OIDC remains the default authentication mode and accepts no identity
+when its issuer configuration is absent.

@@ -56,4 +56,16 @@ All administrative mutations produce tenant/principal-bound audit and transactio
 
 ## Local development
 
-Any future local development authentication mode must be explicitly enabled, visibly identify development principals, and be structurally unable to activate under production configuration. Its exact mechanism is selected in Phase 1.
+Local development authentication uses one fixed, operator-configured tenant and
+principal. It activates only when both process mode is `development` and
+authentication mode is explicitly `local-development`. Startup rejects this
+mode in `test` and `production`, rejects incomplete local identity
+configuration, and rejects simultaneous OIDC configuration. The adapter repeats
+these mode checks when it is constructed.
+
+The resulting principal is always prefixed `local-development:`. The adapter
+accepts no bearer credential and never derives tenant or principal from a
+request header, body, query, source address, or other caller-controlled value.
+Supplying bearer material in this mode fails closed. Local identities remain
+subject to separately configured role grants and all domain authorization
+checks; the mode grants no administrative action by itself.

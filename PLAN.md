@@ -1420,7 +1420,11 @@ Provides ordered, resumable security/supply-chain events such as:
 
 ## 22. Authentication, authorization, and tenant scope
 
-Authentication uses OIDC/JWT against configured issuers.
+Authentication uses OIDC/JWT against configured issuers. Disposable local
+development may instead select one fixed operator-configured identity through
+an explicit `local-development` authentication mode. That mode is rejected
+outside development process mode, cannot coexist with OIDC configuration, and
+visibly prefixes its principal identity; it grants no role or action.
 
 Validate:
 

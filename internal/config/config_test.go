@@ -85,6 +85,46 @@ func TestProductionRequiresDatabaseSecretReference(t *testing.T) {
 	}
 }
 
+func TestLocalDevelopmentAuthenticationIsExplicitAndProductionIncompatible(t *testing.T) {
+	args := []string{"--authentication-mode=local-development",
+		"--authentication-local-development-tenant-id=0198fc21-ced5-7000-8000-000000000001",
+		"--authentication-local-development-principal=alice"}
+	cfg, err := Load(args, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Authentication.Mode != AuthenticationModeLocalDevelopment {
+		t.Fatalf("unexpected authentication mode: %s", cfg.Authentication.Mode)
+	}
+
+	for name, extra := range map[string][]string{
+		"production": {"--mode=production", "--database-url=env:TPMP_DATABASE_DSN"},
+		"test":       {"--mode=test"},
+		"oidc":       {"--oidc-issuer=https://issuer.example.test", "--oidc-audience=mp", "--oidc-allowed-algorithms=RS256", "--oidc-tenant-claim=groups", "--oidc-principal-claim=sub", `--oidc-tenant-mappings=[{"claim_value":"a","tenant_id":"0198fc21-ced5-7000-8000-000000000001"}]`},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(append(append([]string(nil), args...), extra...), nil); err == nil {
+				t.Fatal("expected local development authentication rejection")
+			}
+		})
+	}
+}
+
+func TestAuthenticationConfigurationRequiresCompleteModeSpecificFields(t *testing.T) {
+	for name, args := range map[string][]string{
+		"unknown mode":       {"--authentication-mode=anything"},
+		"missing tenant":     {"--authentication-mode=local-development", "--authentication-local-development-principal=alice"},
+		"missing principal":  {"--authentication-mode=local-development", "--authentication-local-development-tenant-id=0198fc21-ced5-7000-8000-000000000001"},
+		"local data in OIDC": {"--authentication-local-development-principal=alice"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := Load(args, nil); err == nil {
+				t.Fatal("expected authentication configuration error")
+			}
+		})
+	}
+}
+
 func TestValidationBounds(t *testing.T) {
 	tests := []struct {
 		name   string

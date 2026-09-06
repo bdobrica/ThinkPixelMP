@@ -43,10 +43,12 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+const postgresImage = "postgres:18.6-bookworm"
+
 // This suite always uses its own disposable pinned PostgreSQL container. It never
 // connects to an operator-supplied database or removes an existing container.
 func TestPostgres(t *testing.T) {
-	out, err := exec.Command("docker", "run", "--detach", "--rm", "--publish", "127.0.0.1::5432", "--env", "POSTGRES_HOST_AUTH_METHOD=trust", "postgres:18.6-bookworm").CombinedOutput()
+	out, err := exec.Command("docker", "run", "--detach", "--rm", "--publish", "127.0.0.1::5432", "--env", "POSTGRES_HOST_AUTH_METHOD=trust", postgresImage).CombinedOutput()
 	if err != nil {
 		t.Fatalf("start PostgreSQL: %v: %s", err, out)
 	}
@@ -103,26 +105,95 @@ func TestPostgres(t *testing.T) {
 		t.Cleanup(func() { _ = conn.Close(context.Background()) })
 		return conn
 	}
-	t.Run("empty_repeat_and_RLS", func(t *testing.T) {
+	t.Run("migration_from_empty", func(t *testing.T) {
 		conn := newDB(t, "tenant_test")
-		states, err := Run(ctx, conn, migrations.Files, false)
-		if err != nil || len(states) != 14 || states[0].Applied || states[1].Applied || states[2].Applied || states[3].Applied || states[4].Applied || states[5].Applied || states[6].Applied || states[7].Applied || states[8].Applied || states[9].Applied || states[10].Applied || states[11].Applied || states[12].Applied || states[13].Applied {
-			t.Fatalf("empty status: %v %v", states, err)
-		}
-		var exists bool
-		_ = conn.QueryRow(ctx, "SELECT to_regclass('public.schema_migrations') IS NOT NULL").Scan(&exists)
-		if exists {
-			t.Fatal("status wrote a ledger")
-		}
-		for range 2 {
-			if _, err := Run(ctx, conn, migrations.Files, true); err != nil {
+		assertTables := func(want []string) {
+			t.Helper()
+			rows, err := conn.Query(ctx, `SELECT tablename FROM pg_catalog.pg_tables WHERE schemaname = 'public' ORDER BY tablename`)
+			if err != nil {
 				t.Fatal(err)
 			}
+			defer rows.Close()
+			var got []string
+			for rows.Next() {
+				var name string
+				if err := rows.Scan(&name); err != nil {
+					t.Fatal(err)
+				}
+				got = append(got, name)
+			}
+			if err := rows.Err(); err != nil {
+				t.Fatal(err)
+			}
+			if strings.Join(got, ",") != strings.Join(want, ",") {
+				t.Fatalf("public tables = %v, want %v", got, want)
+			}
 		}
+		assertStates := func(states []State, applied bool) {
+			t.Helper()
+			if len(states) != 14 {
+				t.Fatalf("migration count = %d, want 14", len(states))
+			}
+			for _, state := range states {
+				if state.Applied != applied {
+					t.Fatalf("migration %s applied = %t, want %t", state.Name, state.Applied, applied)
+				}
+			}
+		}
+
+		assertTables(nil)
+		states, err := Run(ctx, conn, migrations.Files, false)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertStates(states, false)
+		assertTables(nil)
+
+		states, err = Run(ctx, conn, migrations.Files, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertStates(states, true)
+		expectedTables := []string{
+			"artifact_dependencies", "artifact_descriptors", "artifact_requirements",
+			"artifact_sources", "artifact_versions", "artifacts", "audit_events",
+			"idempotency_records", "namespace_delegation_state_records",
+			"namespace_delegations", "namespaces", "outbox_messages",
+			"publisher_state_records", "publishers", "schema_migrations",
+			"tenant_event_sequences", "tenants",
+		}
+		assertTables(expectedTables)
+		var ledgerCount int
+		if err := conn.QueryRow(ctx, "SELECT count(*) FROM public.schema_migrations").Scan(&ledgerCount); err != nil || ledgerCount != len(states) {
+			t.Fatalf("migration ledger count = %d, want %d: %v", ledgerCount, len(states), err)
+		}
+		var unprotected []string
+		rows, err := conn.Query(ctx, `SELECT relname FROM pg_catalog.pg_class JOIN pg_catalog.pg_namespace ON pg_namespace.oid = relnamespace WHERE nspname = 'public' AND relkind = 'r' AND relname <> 'schema_migrations' AND (NOT relrowsecurity OR NOT relforcerowsecurity) ORDER BY relname`)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for rows.Next() {
+			var name string
+			if err := rows.Scan(&name); err != nil {
+				t.Fatal(err)
+			}
+			unprotected = append(unprotected, name)
+		}
+		rows.Close()
+		if len(unprotected) != 0 {
+			t.Fatalf("tenant tables without enabled and forced RLS: %v", unprotected)
+		}
+
+		states, err = Run(ctx, conn, migrations.Files, true)
+		if err != nil {
+			t.Fatal(err)
+		}
+		assertStates(states, true)
 		states, err = Run(ctx, conn, migrations.Files, false)
-		if err != nil || !states[0].Applied || !states[1].Applied || !states[2].Applied || !states[3].Applied || !states[4].Applied || !states[5].Applied || !states[6].Applied || !states[7].Applied || !states[8].Applied || !states[9].Applied || !states[10].Applied || !states[11].Applied || !states[12].Applied || !states[13].Applied {
-			t.Fatalf("applied status: %v %v", states, err)
+		if err != nil {
+			t.Fatal(err)
 		}
+		assertStates(states, true)
 		execSQL := func(sql string) {
 			t.Helper()
 			if _, err := conn.Exec(ctx, sql); err != nil {

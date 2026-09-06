@@ -1,6 +1,12 @@
 # Continuous integration
 
-The GitHub Actions workflow runs the root `make verify` gate and a separate hardened-container smoke test on pull requests, pushes to `main`, and manual dispatches. CI is validation-only: it does not publish artifacts, mutate repository state, request an OIDC identity token, or consume repository secrets.
+The GitHub Actions workflow runs the root `make verify` gate, the Docker-backed
+`make test-migrations` gate, and a separate hardened-container smoke test on pull
+requests, pushes to `main`, and manual dispatches. The database job creates and
+removes its own loopback-only PostgreSQL `18.6-bookworm` container and never uses
+an operator database or repository secret. CI is validation-only: it does not
+publish artifacts, mutate repository state, request an OIDC identity token, or
+consume repository secrets.
 
 The workflow grants only read access to repository contents. Checkout credentials are not persisted, every third-party action reference is pinned to a full commit SHA, tool versions come from `go.mod`, `package-lock.json`, and the root `Makefile`, and every job has a bounded timeout. Concurrent runs for the same ref cancel superseded work.
 
@@ -11,6 +17,7 @@ Action upgrades require reviewing the upstream release and changing both the imm
 ```bash
 npm ci --ignore-scripts
 GOTOOLCHAIN=go1.26.7 make verify
+GOTOOLCHAIN=go1.26.7 make test-migrations
 make image
 ```
 

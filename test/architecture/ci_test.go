@@ -22,6 +22,7 @@ func TestCIWorkflowIsLeastPrivilegeAndImmutable(t *testing.T) {
 		"GOTOOLCHAIN: go1.26.7",
 		"npm ci --ignore-scripts",
 		"run: make verify",
+		"run: make test-migrations",
 		"run: make image",
 		"--read-only",
 		"--cap-drop=ALL",

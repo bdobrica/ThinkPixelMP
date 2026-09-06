@@ -55,7 +55,7 @@ type publisherHandler struct {
 }
 
 func (handler *publisherHandler) collection(writer http.ResponseWriter, request *http.Request) {
-	actor, err := handler.authenticate(request)
+	actor, err := authenticate(request, handler.authenticator)
 	if err != nil {
 		writer.Header().Set("WWW-Authenticate", "Bearer")
 		WriteError(writer, request, err)
@@ -72,7 +72,7 @@ func (handler *publisherHandler) collection(writer http.ResponseWriter, request 
 }
 
 func (handler *publisherHandler) member(writer http.ResponseWriter, request *http.Request) {
-	actor, err := handler.authenticate(request)
+	actor, err := authenticate(request, handler.authenticator)
 	if err != nil {
 		writer.Header().Set("WWW-Authenticate", "Bearer")
 		WriteError(writer, request, err)
@@ -172,7 +172,7 @@ func (handler *publisherHandler) list(writer http.ResponseWriter, request *http.
 	writeJSON(writer, http.StatusOK, response)
 }
 
-func (handler *publisherHandler) authenticate(request *http.Request) (identity.Identity, error) {
+func authenticate(request *http.Request, authenticator identity.Authenticator) (identity.Identity, error) {
 	values := request.Header.Values("Authorization")
 	credential := ""
 	if len(values) > 1 {
@@ -185,7 +185,7 @@ func (handler *publisherHandler) authenticate(request *http.Request) (identity.I
 		}
 		credential = parts[1]
 	}
-	return handler.authenticator.Authenticate(request.Context(), credential)
+	return authenticator.Authenticate(request.Context(), credential)
 }
 
 func (handler *publisherHandler) writeDecodeError(writer http.ResponseWriter, request *http.Request, err error) {

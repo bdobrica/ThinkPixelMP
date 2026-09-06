@@ -36,6 +36,22 @@ A namespace is a tenant-scoped hierarchical path of lowercase DNS-style segments
 
 An artifact name follows the same single-segment rule. The canonical logical identity is `{namespace}/{name}`.
 
+### Namespace API
+
+`POST /v1/namespaces`, `GET /v1/namespaces/{namespace_id}`, and
+`GET /v1/namespaces` are authenticated and tenant scoped. Create requires the
+exact `namespace.manage` administrative action and an `Idempotency-Key`; reads
+expose only the authenticated tenant's Namespace records. Request bodies cannot
+select a tenant.
+
+Create atomically establishes its idempotency result with the Namespace and
+mutation audit record. Replaying the same caller, action, key, and canonical
+request returns the established resource; changing the request under that
+ownership tuple is a conflict. The owner must be a verified Publisher in the
+authenticated tenant. List order is ascending UUIDv7 Namespace ID with the
+API-wide default/maximum page sizes. Its opaque cursor is authenticated and
+bound to tenant, endpoint, page size, ordering, and expiry.
+
 Within one tenant:
 
 - canonical namespace paths are unique;

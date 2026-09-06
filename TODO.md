@@ -126,7 +126,7 @@ Completion metadata format:
 - [x] DB-014 Add transaction manager and repository interfaces. — completed 2026-09-06, commit 0b2fcda, evidence: `docs/evidence/db-014-transaction-manager.md`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-015 Add optimistic concurrency where mutable administrative state requires it. — completed 2026-09-06, commit 87b4c24, evidence: `docs/evidence/db-015-optimistic-concurrency.md`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; three-run publisher concurrency stress; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] IAM-001 Implement OIDC/JWT verification with issuer/audience/algorithm/expiry/clock-skew validation. — completed 2026-09-06, commit 3c658c2, evidence: `docs/evidence/iam-001-oidc-jwt-verification.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/adapters/oidc ./internal/config ./internal/ports/identity`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] IAM-002 Implement claim-to-tenant/principal mapping.
+- [x] IAM-002 Implement claim-to-tenant/principal mapping. — completed 2026-09-06, commit cf049d8, evidence: `docs/evidence/iam-002-claim-mapping.md`; `GOTOOLCHAIN=go1.26.7 go test -race ./internal/adapters/oidc ./internal/config ./internal/ports/identity`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] IAM-003 Implement marketplace administrative roles/actions for publisher, namespace, publication, evidence producer, reviewer, catalog admin, revocation admin, federation admin.
 - [ ] IAM-004 Implement explicitly configured local development auth mode that cannot activate under production config accidentally.
 - [ ] PUB-001 Implement Publisher create/read/list API.

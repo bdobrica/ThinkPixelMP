@@ -124,7 +124,7 @@ Completion metadata format:
 - [x] DB-012 Add IdempotencyRecord with tenant/principal/action/request-digest ownership. — completed 2026-09-06, commit 51d6b25, evidence: `docs/evidence/db-012-idempotency-records.md`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make test-migrations`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-013 Add transactional OutboxMessage with replay-safe claiming/retry/dead-letter metadata. — completed 2026-09-06, commit ed04d32, evidence: `docs/evidence/db-013-outbox-messages.md`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make test-migrations`; workspace-local-cache `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [x] DB-014 Add transaction manager and repository interfaces. — completed 2026-09-06, commit 0b2fcda, evidence: `docs/evidence/db-014-transaction-manager.md`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
-- [ ] DB-015 Add optimistic concurrency where mutable administrative state requires it.
+- [x] DB-015 Add optimistic concurrency where mutable administrative state requires it. — completed 2026-09-06, commit 87b4c24, evidence: `docs/evidence/db-015-optimistic-concurrency.md`; `GOTOOLCHAIN=go1.26.7 make test-migrations`; three-run publisher concurrency stress; `GOTOOLCHAIN=go1.26.7 make verify`; `git diff --check`
 - [ ] IAM-001 Implement OIDC/JWT verification with issuer/audience/algorithm/expiry/clock-skew validation.
 - [ ] IAM-002 Implement claim-to-tenant/principal mapping.
 - [ ] IAM-003 Implement marketplace administrative roles/actions for publisher, namespace, publication, evidence producer, reviewer, catalog admin, revocation admin, federation admin.

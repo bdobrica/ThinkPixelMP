@@ -60,6 +60,14 @@ The normalized descriptor repeats `{namespace, name, version}` as an integrity c
 
 Registration supplies the attributed `publisher_id`, strict version, typed source, and optional expected digest. MP obtains the descriptor from the immutable OCI/import source rather than trusting an unrelated inline descriptor. It resolves and verifies the authoritative digest asynchronously before commit. Expected-digest mismatch creates no ArtifactVersion.
 
+The application registration persistence seam accepts only trusted pipeline
+output that already contains the exact resolved reference and digest. It
+atomically creates the ArtifactVersion, its matching ArtifactSource, mutation
+audit, and idempotency result after rechecking authenticated publication
+authority and live namespace ownership. This internal seam is not the public
+registration request: public callers submit the source shape above, and the
+resolution and inspection pipeline supplies immutable data to the seam.
+
 Caller authentication, attributed publisher, and namespace ownership are independent checks. Naming a Publisher does not authorize the caller to publish for it.
 
 All evidence, locks, resolutions, promotion decisions, catalog entries, and revocations reference the exact artifact digest and stable ArtifactVersion identifier.
